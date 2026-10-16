@@ -23,6 +23,7 @@ import { stamp, nowIso } from "@/lib/id";
 import { fitTier, placeWithGrowth, MAX_AREAS } from "@/lib/island-layout";
 import { AREA_LABELS } from "@/lib/activities";
 import { addDays } from "@/lib/time";
+import { reorderSubset } from "@/lib/goals";
 
 type Patch<T> = Partial<Omit<T, "id" | "createdAt">>;
 
@@ -260,11 +261,10 @@ export const useApp = create<AppState>()((set, get) => {
       for (const b of get().blocks) if (b.todoId === id) put("blocks", { ...b, todoId: null });
     },
     reorderTodos(orderedIds) {
-      const byId = new Map(get().todos.map((t) => [t.id, t]));
-      const changed = orderedIds
-        .map((id, i) => byId.get(id) && { ...byId.get(id)!, order: i })
-        .filter((t): t is Todo => !!t && byId.get(t.id)!.order !== t.order)
-        .map(touch);
+      const slots = reorderSubset(get().todos, orderedIds);
+      const changed = get()
+        .todos.filter((t) => slots.has(t.id) && slots.get(t.id) !== t.order)
+        .map((t) => touch({ ...t, order: slots.get(t.id)! }));
       if (!changed.length) return;
       const map = new Map(changed.map((t) => [t.id, t]));
       set((s) => ({ todos: s.todos.map((t) => map.get(t.id) ?? t) }));

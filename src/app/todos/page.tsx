@@ -1,9 +1,5 @@
-import { PageContainer, PageHeader } from "@/components/shell/page-header";
+import { TodosView } from "@/components/todos/todos-view";
 
 export default function TodosPage() {
-  return (
-    <PageContainer>
-      <PageHeader title="Todos" subtitle="Coming together…" />
-    </PageContainer>
-  );
+  return <TodosView />;
 }

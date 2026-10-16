@@ -331,8 +331,8 @@ function drawFlowers(buf: PixelBuffer, style: BuildingStyle) {
 function dustify(buf: PixelBuffer) {
   const grey = hexToRgb("#8f8a99");
   buf.map(([r, g, b]) => {
-    const d = hexToRgb(desaturate(`#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`, 0.45));
-    return [d[0] * 0.88 + grey[0] * 0.04, d[1] * 0.88 + grey[1] * 0.04, d[2] * 0.88 + grey[2] * 0.04];
+    const d = hexToRgb(desaturate(`#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`, 0.32));
+    return [d[0] * 0.92 + grey[0] * 0.04, d[1] * 0.92 + grey[1] * 0.04, d[2] * 0.92 + grey[2] * 0.04];
   });
   const web = "#e9e6ef";
   const cx = AX - 24;

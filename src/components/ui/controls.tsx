@@ -75,8 +75,8 @@ export function Segmented<T extends string | number>({
   className,
 }: {
   value: T;
-  onChange(v: T): void;
-  options: { value: T; label: ReactNode }[];
+  onChange(v: NoInfer<T>): void;
+  options: { value: NoInfer<T>; label: ReactNode }[];
   label: string;
   className?: string;
 }) {
