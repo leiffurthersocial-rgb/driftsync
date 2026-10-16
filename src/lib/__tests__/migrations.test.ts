@@ -99,3 +99,28 @@ describe("LocalStorageRepository", () => {
     expect(stored.lists[0].deletedAt).toBeTruthy();
   });
 });
+
+describe("v1 → v2", () => {
+  it("splits the single accessory into the new appearance slots and adds activity styles", () => {
+    const t = new Date().toISOString();
+    for (const [acc, check] of [
+      ["glasses", (a: Record<string, unknown>) => a.eyewear === "round"],
+      ["cap", (a: Record<string, unknown>) => a.headwear === "cap"],
+      ["headphones", (a: Record<string, unknown>) => a.headwear === "headphones"],
+      ["scarf", (a: Record<string, unknown>) => a.neckwear === "scarf"],
+      ["backpack", (a: Record<string, unknown>) => a.backpack === true],
+    ] as const) {
+      const d = migrate({
+        version: 1,
+        profile: { characterName: "Mo", onboarded: true, appearance: { skin: 2, hairStyle: "curly", hairColor: "#123456", outfitColor: "#654321", accessory: acc } },
+        activities: [{ id: "a", createdAt: t, updatedAt: t, key: "jogging", name: "Jogging", color: "#eea54b", animation: "jog", areaType: "track" }],
+      });
+      expect(d.version).toBe(2);
+      expect(check(d.profile.appearance as unknown as Record<string, unknown>), acc).toBe(true);
+      expect(d.profile.appearance.hairStyle).toBe("curly");
+      expect(d.profile.appearance.outfitColor).toBe("#654321");
+      expect("accessory" in d.profile.appearance).toBe(false);
+      expect(d.activities[0].style).toBe("auto");
+    }
+  });
+});

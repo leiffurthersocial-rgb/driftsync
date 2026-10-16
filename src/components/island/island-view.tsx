@@ -1,6 +1,8 @@
 "use client";
 
+import { LocateFixed, Maximize2, Minus, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "@/lib/cn";
 import { useApp } from "@/store/app-store";
 import { useNow } from "@/hooks/use-now";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
@@ -39,18 +41,22 @@ export function IslandView() {
     [areas, activities, blocks, today, hour],
   );
   const { world, resolved } = useIslandWorld(vitality);
+  const light = lightFor(theme, minute);
   const selectedId = useUi((s) => s.selectedAreaId);
   const selectArea = useUi((s) => s.selectArea);
   const openCharacter = useUi((s) => s.setCharacterCardOpen);
   const introPending = useUi((s) => s.introPending);
-  const light = lightFor(theme, minute);
 
   // One controller for the lifetime of the view.
   const [character] = useState(() => new CharacterController(profile.appearance, profile.characterName));
   character.appearance = profile.appearance;
   character.name = profile.characterName;
 
-  useEffect(() => character.setLayout(resolved.layout), [character, resolved.layout]);
+  useEffect(() => {
+    character.setAreas(areas.map((a) => ({ id: a.id, type: a.type, variant: a.variant, name: a.name })));
+    character.setLayout(resolved.layout);
+  }, [character, resolved.layout, areas]);
+  character.night = light.night;
 
   const intent = useMemo(
     () => resolveIntent({ override: profile.override, blocks, activities, areas, today, minute, now }),
@@ -84,11 +90,48 @@ export function IslandView() {
     return () => clearInterval(t);
   }, [character]);
 
+  const sceneRef = useRef<IslandScene | null>(null);
+  const [follow, setFollow] = useState(false);
+
+  // Bring a selected area into view.
+  useEffect(() => {
+    if (selectedId) sceneRef.current?.panToArea(selectedId);
+  }, [selectedId]);
+
+  // Camera keyboard shortcuts (when not typing): + / - zoom, 0 frame island, F follow.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || e.metaKey || e.ctrlKey || document.querySelector("[role=dialog]")) return;
+      const s = sceneRef.current;
+      if (!s) return;
+      const r = { w: window.innerWidth / 2, h: window.innerHeight / 2 };
+      if (e.key === "+" || e.key === "=") s.zoomAt(1.25, r.w, r.h);
+      else if (e.key === "-") s.zoomAt(0.8, r.w, r.h);
+      else if (e.key === "0") {
+        s.follow = false;
+        setFollow(false);
+        s.resetView(true);
+      } else if (e.key === "f" || e.key === "F") {
+        s.follow = !s.follow;
+        setFollow(s.follow);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const onScene = (scene: IslandScene | null) => {
+    sceneRef.current = scene;
     if (!scene) return;
     let lastText = "";
+    let lastFollow = scene.follow;
     let frame = 0;
     scene.onFrame = () => {
+      if (scene.follow !== lastFollow) {
+        lastFollow = scene.follow;
+        setFollow(scene.follow);
+      }
       // Floating name tag over the hovered/selected area, positioned without React renders.
       const el = labelRef.current;
       if (el) {
@@ -131,7 +174,7 @@ export function IslandView() {
         selectedId={selectedId}
         actor={character}
         intro={intro}
-        label={`${islandName}, your floating island with ${areas.length} areas. ${profile.characterName}: ${status}. Use the area list and character button to interact.`}
+        label={`${islandName}, your floating island with ${areas.length} areas. ${profile.characterName}: ${status}. Drag to pan, scroll or pinch to zoom; use the area list and character button to interact.`}
         onHit={(hit) => {
           if (hit?.kind === "character") openCharacter(true);
           else selectArea(hit?.kind === "area" ? hit.id : null);
@@ -151,6 +194,24 @@ export function IslandView() {
       </IslandCanvas>
 
       <IslandTitle now={now} />
+
+      <CameraControls
+        follow={follow}
+        onZoom={(f) => sceneRef.current?.zoomAt(f, window.innerWidth / 2, window.innerHeight / 2)}
+        onFit={() => {
+          const s = sceneRef.current;
+          if (!s) return;
+          s.follow = false;
+          setFollow(false);
+          s.resetView(true);
+        }}
+        onFollow={() => {
+          const s = sceneRef.current;
+          if (!s) return;
+          s.follow = !s.follow;
+          setFollow(s.follow);
+        }}
+      />
 
       {/* Desktop HUD */}
       <div className="absolute left-6 top-40 hidden flex-col gap-3 md:flex">
@@ -179,6 +240,36 @@ export function IslandView() {
       <AreaSheet vitality={vitality} />
       <AddAreaDialog />
       <CharacterCard status={status} anim={anim} />
+    </div>
+  );
+}
+
+function CameraControls({ follow, onZoom, onFit, onFollow }: { follow: boolean; onZoom(f: number): void; onFit(): void; onFollow(): void }) {
+  const btn = "grid h-9 w-9 place-items-center rounded-xl text-muted transition hover:bg-surface-2 hover:text-ink";
+  return (
+    <div
+      role="toolbar"
+      aria-label="Camera"
+      className="card absolute right-3 top-[4.5rem] flex flex-col gap-0.5 bg-surface/85 p-1 backdrop-blur-md md:bottom-6 md:right-6 md:top-auto"
+    >
+      <button className={btn} onClick={() => onZoom(1.25)} aria-label="Zoom in (+)" title="Zoom in (+)">
+        <Plus size={16} />
+      </button>
+      <button className={btn} onClick={() => onZoom(0.8)} aria-label="Zoom out (−)" title="Zoom out (−)">
+        <Minus size={16} />
+      </button>
+      <button className={btn} onClick={onFit} aria-label="Show the whole island (0)" title="Whole island (0)">
+        <Maximize2 size={15} />
+      </button>
+      <button
+        className={cn(btn, follow && "bg-accent/15 text-accent")}
+        onClick={onFollow}
+        aria-pressed={follow}
+        aria-label="Follow your character (F)"
+        title="Follow character (F)"
+      >
+        <LocateFixed size={16} />
+      </button>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 
 const cache = new Map<string, string>();
 
-/** Small static render of an area's building sprite (with a grass pad), as an <img>. */
+/** Static render of an area design on a grass pad, cropped to its content, as an <img>. */
 export function BuildingPreview({
   type,
   variant = 0,
@@ -30,25 +30,33 @@ export function BuildingPreview({
     const hit = cache.get(key);
     if (hit) return setSrc(hit);
     const { base } = renderBuilding(type, variant, color, vitality, TERRAIN.base.outline);
-    // Grass pad under the footprint so the preview reads as "on the island".
     const pad = new PixelBuffer(base.buffer.width, base.buffer.height);
+    const { ax, ay } = base;
     pad.poly(
       [
-        [base.ax, base.ay - 2],
-        [base.ax + 36, base.ay + 16],
-        [base.ax, base.ay + 34],
-        [base.ax - 36, base.ay + 16],
+        [ax, ay - 6],
+        [ax + 104, ay + 46],
+        [ax, ay + 98],
+        [ax - 104, ay + 46],
       ],
-      TERRAIN.base.grass,
+      (x, y) => ((Math.floor((x - ax) / 16 + (y - ay) / 8) + Math.floor((y - ay) / 8 - (x - ax) / 16)) % 2 ? TERRAIN.base.grass : TERRAIN.base.grassDark),
     );
     pad.outline(TERRAIN.base.cliffTop);
-    const canvas = pad.toCanvas();
-    canvas.getContext("2d")!.drawImage(base.canvas, 0, 0);
-    // Trim empty headroom.
+    pad.stamp(base.buffer, 0, 0);
+    // Crop to the opaque bounding box.
+    let top = pad.height;
+    let bottom = 0;
+    for (let y = 0; y < pad.height; y++)
+      for (let x = 0; x < pad.width; x++)
+        if (pad.alphaAt(x, y)) {
+          top = Math.min(top, y);
+          bottom = Math.max(bottom, y);
+        }
+    const full = pad.toCanvas();
     const crop = document.createElement("canvas");
-    crop.width = canvas.width;
-    crop.height = 92;
-    crop.getContext("2d")!.drawImage(canvas, 0, crop.height - canvas.height);
+    crop.width = full.width;
+    crop.height = bottom - top + 2;
+    crop.getContext("2d")!.drawImage(full, 0, -top + 1);
     const url = crop.toDataURL();
     cache.set(key, url);
     setSrc(url);
@@ -56,7 +64,7 @@ export function BuildingPreview({
 
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" aria-hidden className={cn("pixelated select-none", className)} draggable={false} />
+    <img src={src} alt="" aria-hidden className={cn("pixelated select-none object-contain", className)} draggable={false} />
   ) : (
     <div className={cn("animate-pulse rounded-xl bg-surface-2", className)} aria-hidden />
   );

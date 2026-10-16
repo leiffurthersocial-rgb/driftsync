@@ -40,6 +40,24 @@ export const migrations: Record<number, Migration> = {
     }
     return out;
   },
+  /** v1 → v2: single `accessory` split into headwear/eyewear/neckwear/backpack; activities gain `style`. */
+  1: (data) => {
+    const out: Raw = { ...data, version: 2 };
+    if (isObject(data.profile) && isObject(data.profile.appearance)) {
+      const a = { ...data.profile.appearance };
+      const acc = a.accessory;
+      delete a.accessory;
+      if (acc === "glasses") a.eyewear = "round";
+      if (acc === "cap") a.headwear = "cap";
+      if (acc === "headphones") a.headwear = "headphones";
+      if (acc === "scarf") a.neckwear = "scarf";
+      if (acc === "backpack") a.backpack = true;
+      out.profile = { ...data.profile, appearance: a };
+    }
+    if (Array.isArray(data.activities))
+      out.activities = data.activities.map((x) => (isObject(x) && typeof x.style !== "string" ? { ...x, style: "auto" } : x));
+    return out;
+  },
 };
 
 /** Validate a collection, dropping only the records that fail rather than the whole dataset. */

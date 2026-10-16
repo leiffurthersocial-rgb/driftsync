@@ -8,6 +8,7 @@ import { AREA_LABELS, activitiesForArea } from "@/lib/activities";
 import { ConfirmDialog, Dialog } from "@/components/ui/dialog";
 import { ColorSwatches } from "@/components/ui/controls";
 import { BuildingPreview } from "./building-preview";
+import { designFor } from "@/island/sprites/designs";
 import type { Vitality } from "@/island/sprites/buildings";
 import { cn } from "@/lib/cn";
 
@@ -58,11 +59,11 @@ export function AreaSheet({ vitality }: { vitality: Record<string, Vitality> }) 
         }}
         variant="sheet"
         title={shown.name}
-        description={AREA_LABELS[shown.type]}
+        description={`${AREA_LABELS[shown.type]} · ${designFor(shown.type, shown.variant).name}`}
       >
         <div className="space-y-6">
           <div className="flex items-center gap-4 rounded-2xl bg-surface-2/60 p-3">
-            <BuildingPreview type={shown.type} variant={shown.variant} color={shown.color} vitality={v} className="h-[92px] w-[76px]" />
+            <BuildingPreview type={shown.type} variant={shown.variant} color={shown.color} vitality={v} className="h-28 w-36 shrink-0" />
             <p className="text-sm text-muted">{VITALITY_COPY[v]}</p>
           </div>
 
@@ -94,19 +95,21 @@ export function AreaSheet({ vitality }: { vitality: Record<string, Vitality> }) 
 
           <div>
             <span className="label">Style</span>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[0, 1, 2].map((variant) => (
                 <button
                   key={variant}
                   onClick={() => updateArea(shown.id, { variant })}
                   aria-pressed={shown.variant === variant}
-                  aria-label={`Style ${variant + 1}`}
+                  aria-label={designFor(shown.type, variant).name}
+                  title={designFor(shown.type, variant).blurb}
                   className={cn(
-                    "rounded-xl p-1 transition",
-                    shown.variant === variant ? "bg-surface-2 ring-2 ring-accent" : "opacity-70 hover:bg-surface-2 hover:opacity-100",
+                    "flex flex-col items-center gap-1 rounded-xl p-1.5 text-center transition",
+                    shown.variant === variant ? "bg-surface-2 ring-2 ring-accent" : "opacity-75 hover:bg-surface-2 hover:opacity-100",
                   )}
                 >
-                  <BuildingPreview type={shown.type} variant={variant} color={shown.color} className="h-[69px] w-[57px]" />
+                  <BuildingPreview type={shown.type} variant={variant} color={shown.color} className="h-16 w-full" />
+                  <span className="text-[11px] font-medium leading-tight">{designFor(shown.type, variant).name}</span>
                 </button>
               ))}
             </div>

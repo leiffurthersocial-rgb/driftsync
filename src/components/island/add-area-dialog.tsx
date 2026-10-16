@@ -11,6 +11,7 @@ import { toast, useUi } from "@/store/ui-store";
 import { Dialog } from "@/components/ui/dialog";
 import { ColorSwatches } from "@/components/ui/controls";
 import { BuildingPreview } from "./building-preview";
+import { designFor } from "@/island/sprites/designs";
 import { cn } from "@/lib/cn";
 
 /** Two-step "Add area": pick a type, optionally personalize, then auto-place. */
@@ -83,7 +84,7 @@ export function AddAreaDialog() {
                   onClick={() => setType(t)}
                   className="group flex w-full flex-col items-center rounded-2xl border border-line/70 bg-surface-2/40 p-3 text-center transition hover:-translate-y-0.5 hover:border-accent/50 hover:bg-surface-2 disabled:opacity-50"
                 >
-                  <BuildingPreview type={t} className="h-[72px] w-[60px] transition group-hover:scale-105" />
+                  <BuildingPreview type={t} className="h-[64px] w-full transition group-hover:scale-105" />
                   <span className="mt-1 text-sm font-medium">{AREA_LABELS[t]}</span>
                   <span className="text-[11px] leading-tight text-muted">{AREA_BLURBS[t]}</span>
                 </button>
@@ -98,19 +99,21 @@ export function AddAreaDialog() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 10 }}
           >
-            <div className="flex items-end justify-center gap-4 rounded-2xl bg-surface-2/60 py-3">
+            <div className="grid grid-cols-3 gap-2 rounded-2xl bg-surface-2/60 p-2">
               {[0, 1, 2].map((v) => (
                 <button
                   key={v}
                   onClick={() => setVariant(v)}
                   aria-pressed={variant === v}
-                  aria-label={`Style ${v + 1}`}
+                  aria-label={designFor(type, v).name}
                   className={cn(
-                    "rounded-xl p-1 transition",
-                    variant === v ? "bg-surface shadow-soft ring-2 ring-accent" : "opacity-70 hover:opacity-100",
+                    "flex flex-col items-center gap-1 rounded-xl p-1.5 text-center transition",
+                    variant === v ? "bg-surface shadow-soft ring-2 ring-accent" : "opacity-75 hover:opacity-100",
                   )}
                 >
-                  <BuildingPreview type={type} variant={v} color={color} className="h-[92px] w-[76px]" />
+                  <BuildingPreview type={type} variant={v} color={color} className="h-20 w-full" />
+                  <span className="text-xs font-medium leading-tight">{designFor(type, v).name}</span>
+                  <span className="text-[10px] leading-tight text-muted">{designFor(type, v).blurb}</span>
                 </button>
               ))}
             </div>

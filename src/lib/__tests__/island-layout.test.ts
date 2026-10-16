@@ -29,11 +29,27 @@ function addMany(n: number, seed = 42) {
 describe("tiers", () => {
   it("grows with area count and caps", () => {
     expect(tierForCount(0)).toBe(0);
-    expect(tierForCount(2)).toBe(0);
-    expect(tierForCount(3)).toBe(1);
-    expect(tierForCount(6)).toBe(2);
+    expect(tierForCount(3)).toBe(0);
+    expect(tierForCount(4)).toBe(1);
+    expect(tierForCount(7)).toBe(2);
     expect(tierForCount(100)).toBe(5);
-    expect(sizeForTier(99)).toBe(22);
+    expect(sizeForTier(99)).toBe(44);
+  });
+});
+
+describe("island features", () => {
+  it("has a closed jogging loop on land, a pond and a fountain plaza", () => {
+    for (const seed of [3, 77, 4242]) {
+      const L = buildLayout(sizeForTier(0), seed, []);
+      expect(L.trailLoop.length).toBeGreaterThan(60);
+      for (const p of L.trailLoop) expect(L.land[Math.floor(p.y) * L.size + Math.floor(p.x)]).toBe(1);
+      const first = L.trailLoop[0];
+      const last = L.trailLoop[L.trailLoop.length - 1];
+      expect(Math.hypot(first.x - last.x, first.y - last.y)).toBeLessThan(2);
+      expect(L.water.reduce((s, v) => s + v, 0)).toBeGreaterThan(6);
+      expect(L.fountain).toHaveLength(4);
+      expect(L.plaza).toHaveLength(12);
+    }
   });
 });
 
@@ -41,7 +57,7 @@ describe("placement", () => {
   it("places the first area next to the plaza", () => {
     const pos = placeArea(sizeForTier(0), 7, [])!;
     expect(pos).not.toBeNull();
-    expect(Math.abs(pos.x) + Math.abs(pos.y)).toBeLessThanOrEqual(6);
+    expect(Math.abs(pos.x) + Math.abs(pos.y)).toBeLessThanOrEqual(9);
   });
 
   it("is deterministic", () => {
@@ -64,13 +80,27 @@ describe("placement", () => {
           expect(sep).toBeGreaterThanOrEqual(FOOTPRINT + GAP);
         }
 
-      // Generated paths connect every entrance to the plaza.
+      // Generated paths connect every entrance and the jogging trail to the plaza.
       const layout = buildLayout(size, seed, areas);
-      const seen = reachable(
-        { width: size, height: size, walkable: (x, y) => layout.path[y * size + x] === 1 },
-        layout.plaza[0],
-      );
+      const net = (x: number, y: number) => layout.path[y * size + x] === 1 || layout.trail[y * size + x] === 1;
+      const seen = reachable({ width: size, height: size, walkable: net }, layout.plaza[0]);
       for (const a of layout.areas) expect(seen[a.entrance[1] * size + a.entrance[0]]).toBe(1);
+      let trailTiles = 0;
+      let trailReached = 0;
+      for (let i = 0; i < layout.trail.length; i++)
+        if (layout.trail[i]) {
+          trailTiles++;
+          trailReached += seen[i];
+        }
+      expect(trailReached / trailTiles).toBeGreaterThan(0.95);
+
+      // Buildings never sit on the trail, the pond or the fountain.
+      for (const a of layout.areas)
+        for (let dy = 0; dy < FOOTPRINT; dy++)
+          for (let dx = 0; dx < FOOTPRINT; dx++) {
+            const i = (a.gy + dy) * size + a.gx + dx;
+            expect(layout.trail[i] + layout.water[i]).toBe(0);
+          }
     });
   }
 

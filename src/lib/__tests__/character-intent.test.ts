@@ -9,8 +9,8 @@ const areas: Area[] = [
   { ...meta("track"), type: "track", name: "Track", color: null, variant: 0, x: -3, y: 1 },
 ];
 const activities: Activity[] = [
-  { ...meta("jog"), key: "jogging", name: "Jogging", color: "#eea54b", animation: "jog", areaType: "track", areaId: null, preset: true, order: 0 },
-  { ...meta("rest"), key: "rest", name: "Rest", color: "#93a6bd", animation: "rest", areaType: null, areaId: null, preset: true, order: 1 },
+  { ...meta("jog"), key: "jogging", name: "Jogging", color: "#eea54b", animation: "jog", areaType: "track", areaId: null, style: "auto", preset: true, order: 0 },
+  { ...meta("rest"), key: "rest", name: "Rest", color: "#93a6bd", animation: "rest", areaType: null, areaId: null, style: "auto", preset: true, order: 1 },
 ];
 const block = (start: number, end: number, activityId: string): Block => ({
   ...meta(`b${start}`),

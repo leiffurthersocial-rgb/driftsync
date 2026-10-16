@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Bump when the persisted shape changes; add a migration in migrations.ts. */
-export const CURRENT_VERSION = 1;
+export const CURRENT_VERSION = 2;
 
 export const AREA_TYPES = ["gym", "study", "library", "photo", "track", "workshop", "hobby"] as const;
 export type AreaType = (typeof AREA_TYPES)[number];
@@ -9,11 +9,31 @@ export type AreaType = (typeof AREA_TYPES)[number];
 export const ANIMATIONS = ["study", "workout", "jog", "photo", "read", "work", "hobby", "rest", "generic"] as const;
 export type AnimationKind = (typeof ANIMATIONS)[number];
 
-export const HAIR_STYLES = ["short", "long", "bun", "spiky", "curly", "bald"] as const;
+export const HAIR_STYLES = [
+  "short",
+  "buzz",
+  "long",
+  "bob",
+  "ponytail",
+  "bun",
+  "pigtails",
+  "curly",
+  "afro",
+  "spiky",
+  "mohawk",
+  "wavy",
+  "bald",
+] as const;
 export type HairStyle = (typeof HAIR_STYLES)[number];
 
-export const ACCESSORIES = ["none", "glasses", "cap", "headphones", "scarf", "backpack"] as const;
-export type Accessory = (typeof ACCESSORIES)[number];
+export const EYE_STYLES = ["dot", "round", "sparkle", "sleepy", "lashes"] as const;
+export const FACIAL_HAIR = ["none", "stubble", "mustache", "beard"] as const;
+export const TOPS = ["tee", "hoodie", "sweater", "shirt", "tank", "dress", "overalls"] as const;
+export const TOP_PATTERNS = ["solid", "stripes", "dots"] as const;
+export const BOTTOMS = ["pants", "shorts", "skirt"] as const;
+export const HEADWEAR = ["none", "cap", "beanie", "bucket", "headband", "headphones", "flower", "bow"] as const;
+export const EYEWEAR = ["none", "round", "square", "sunglasses"] as const;
+export const NECKWEAR = ["none", "scarf", "necklace"] as const;
 
 export const THEMES = ["auto", "day", "dusk", "retro"] as const;
 export type ThemeSetting = (typeof THEMES)[number];
@@ -31,13 +51,31 @@ const base = {
 };
 
 export const appearanceSchema = z.object({
-  skin: z.number().int().min(0).max(5).catch(1),
+  skin: z.number().int().min(0).max(7).catch(1),
   hairStyle: z.enum(HAIR_STYLES).catch("short"),
   hairColor: hex.catch("#4a3426"),
+  eyeStyle: z.enum(EYE_STYLES).catch("round"),
+  eyeColor: hex.catch("#2b2233"),
+  blush: z.boolean().catch(true),
+  freckles: z.boolean().catch(false),
+  facialHair: z.enum(FACIAL_HAIR).catch("none"),
+  top: z.enum(TOPS).catch("tee"),
+  /** Top color (kept as `outfitColor` for compatibility with v1 data). */
   outfitColor: hex.catch("#6e5ee6"),
-  accessory: z.enum(ACCESSORIES).catch("none"),
-});
-export type Appearance = z.infer<typeof appearanceSchema>;
+  topPattern: z.enum(TOP_PATTERNS).catch("solid"),
+  bottom: z.enum(BOTTOMS).catch("pants"),
+  bottomColor: hex.catch("#3d3a5c"),
+  shoesColor: hex.catch("#4b4458"),
+  headwear: z.enum(HEADWEAR).catch("none"),
+  headwearColor: hex.catch("#e7795f"),
+  eyewear: z.enum(EYEWEAR).catch("none"),
+  neckwear: z.enum(NECKWEAR).catch("none"),
+  neckwearColor: hex.catch("#e7795f"),
+  backpack: z.boolean().catch(false),
+  /** Gym clothes worn for sporty activities. */
+  sportColor: hex.catch("#4fb3b0"),
+  sportSwitch: z.boolean().catch(true),
+});export type Appearance = z.infer<typeof appearanceSchema>;
 
 export const overrideSchema = z.object({
   areaId: z.string(),
@@ -84,6 +122,8 @@ export const activitySchema = z.object({
   animation: z.enum(ANIMATIONS).catch("generic"),
   areaType: z.enum(AREA_TYPES).nullable().catch(null),
   areaId: nullableId,
+  /** "auto" rotates between routines; otherwise a routine id (see island/character/routines.ts). */
+  style: z.string().catch("auto"),
   preset: z.boolean().catch(false),
   order: z.number().catch(0),
 });

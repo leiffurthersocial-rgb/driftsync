@@ -1,5 +1,6 @@
 import { stamp } from "@/lib/id";
 import {
+  appearanceSchema,
   CURRENT_VERSION,
   type Activity,
   type AnimationKind,
@@ -32,13 +33,13 @@ export const PRESET_ACTIVITIES: PresetDef[] = [
 ];
 
 export function defaultActivities(): Activity[] {
-  return PRESET_ACTIVITIES.map((p, i) => ({ ...stamp(), ...p, areaId: null, preset: true, order: i }));
+  return PRESET_ACTIVITIES.map((p, i) => ({ ...stamp(), ...p, areaId: null, style: "auto", preset: true, order: i }));
 }
 
 export function defaultProfile(): Profile {
   return {
     characterName: "Pip",
-    appearance: { skin: 1, hairStyle: "short", hairColor: "#4a3426", outfitColor: "#6e5ee6", accessory: "none" },
+    appearance: appearanceSchema.parse({}),
     onboarded: false,
     override: null,
     updatedAt: new Date().toISOString(),

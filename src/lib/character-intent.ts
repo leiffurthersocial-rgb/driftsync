@@ -34,6 +34,8 @@ export interface Intent {
   /** Minute of day the activity ends (blocks only). */
   until: number | null;
   key: string;
+  /** Pinned routine id from the activity's settings, or "auto". */
+  style: string;
 }
 
 /**
@@ -70,6 +72,7 @@ export function resolveIntent(input: {
         label: act?.name ?? ANIMATION_VERB[animation],
         until: null,
         key: `m:${overrideArea.id}:${animation}`,
+        style: act?.style ?? "auto",
       };
     }
   }
@@ -86,7 +89,8 @@ export function resolveIntent(input: {
       label: active.title || act?.name || ANIMATION_VERB[animation],
       until: active.end,
       key: `b:${active.id}:${area?.id ?? "plaza"}:${animation}`,
+      style: act?.style ?? "auto",
     };
   }
-  return { source: "none", areaId: null, areaType: null, animation: "generic", label: "", until: null, key: "none" };
+  return { source: "none", areaId: null, areaType: null, animation: "generic", label: "", until: null, key: "none", style: "auto" };
 }

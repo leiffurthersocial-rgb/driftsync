@@ -1,9 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Dices } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { ACCESSORIES, AREA_TYPES, HAIR_STYLES, type Appearance, type AreaType } from "@/data/schema";
+import { AREA_TYPES, type Appearance, type AreaType } from "@/data/schema";
 import { useApp } from "@/store/app-store";
 import { toast, useUi } from "@/store/ui-store";
 import { AREA_BLURBS, AREA_LABELS } from "@/lib/activities";
@@ -13,36 +13,14 @@ import { minutesOfDay } from "@/lib/time";
 import { usePrefersReducedMotion } from "@/hooks/use-reduced-motion";
 import { IslandCanvas } from "@/components/island/island-canvas";
 import { BuildingPreview } from "@/components/island/building-preview";
-import { CharacterPreview } from "@/components/character/character-preview";
-import { ColorSwatches, SWATCHES } from "@/components/ui/controls";
+import { CharacterCreator } from "@/components/character/character-creator";
 import { CharacterController } from "@/island/character/controller";
-import { HAIR_COLORS, SKIN_TONES } from "@/island/sprites/character";
 import type { SceneWorld } from "@/island/scene";
 import { Logo } from "@/components/shell/logo";
 import { cn } from "@/lib/cn";
 
 const DEFAULT_AREAS: AreaType[] = ["gym", "study", "library", "track"];
 const STEPS = ["Welcome", "Character", "Areas"] as const;
-
-const ACCESSORY_LABELS: Record<Appearance["accessory"], string> = {
-  none: "None",
-  glasses: "Glasses",
-  cap: "Cap",
-  headphones: "Headphones",
-  scarf: "Scarf",
-  backpack: "Backpack",
-};
-
-export function randomAppearance(): Appearance {
-  const pick = <T,>(arr: readonly T[]) => arr[Math.floor(Math.random() * arr.length)];
-  return {
-    skin: Math.floor(Math.random() * SKIN_TONES.length),
-    hairStyle: pick(HAIR_STYLES),
-    hairColor: pick(HAIR_COLORS),
-    outfitColor: pick(SWATCHES),
-    accessory: pick(ACCESSORIES),
-  };
-}
 
 /** First-run flow: name → character → starter areas → island assembles. Every step is skippable. */
 export function Onboarding() {
@@ -81,9 +59,10 @@ export function Onboarding() {
   const [character] = useState(() => new CharacterController(appearance, name));
   character.appearance = appearance;
   useEffect(() => {
+    character.setAreas(world.areas.map((a) => ({ id: a.id, type: a.type, variant: a.variant, name: a.name })));
     character.setLayout(world.layout);
-    character.setIntent({ source: "none", areaId: null, areaType: null, animation: "generic", label: "", until: null, key: "none" });
-  }, [character, world.layout]);
+    character.setIntent({ source: "none", areaId: null, areaType: null, animation: "generic", label: "", until: null, key: "none", style: "auto" });
+  }, [character, world.layout, world.areas]);
 
   const light = lightFor(theme, minutesOfDay(new Date()));
 
@@ -209,7 +188,7 @@ export function Onboarding() {
                                 on ? "border-accent/60 bg-accent/10" : "border-line/70 hover:bg-surface-2",
                               )}
                             >
-                              <BuildingPreview type={t} className="h-[46px] w-[38px] shrink-0" />
+                              <BuildingPreview type={t} className="h-[44px] w-[52px] shrink-0" />
                               <span className="min-w-0">
                                 <span className="block text-sm font-medium">{AREA_LABELS[t]}</span>
                                 <span className="block truncate text-[11px] text-muted">{AREA_BLURBS[t]}</span>
@@ -243,83 +222,5 @@ export function Onboarding() {
         </motion.section>
       </div>
     </main>
-  );
-}
-
-export function CharacterCreator({
-  appearance,
-  onChange,
-  name,
-  compact,
-}: {
-  appearance: Appearance;
-  onChange(a: Appearance): void;
-  name: string;
-  compact?: boolean;
-}) {
-  const set = (patch: Partial<Appearance>) => onChange({ ...appearance, ...patch });
-  return (
-    <div className="space-y-4">
-      {!compact && <h2 className="font-pixel text-2xl">Make {name} yours</h2>}
-      <div className="flex items-center gap-4 rounded-2xl bg-surface-2/60 p-3">
-        <CharacterPreview appearance={appearance} scale={4} label={`Preview of ${name}`} className="h-[120px] w-24 shrink-0" />
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted">Live preview. Everything can be changed later in Settings.</p>
-          <button type="button" className="btn-soft self-start" onClick={() => onChange(randomAppearance())}>
-            <Dices size={16} /> Randomize
-          </button>
-        </div>
-      </div>
-      <Field label="Skin">
-        <ColorSwatches label="Skin tone" colors={SKIN_TONES} value={SKIN_TONES[appearance.skin]} onChange={(c) => set({ skin: Math.max(0, SKIN_TONES.indexOf(c ?? "")) })} />
-      </Field>
-      <Field label="Hair">
-        <div role="radiogroup" aria-label="Hair style" className="flex flex-wrap gap-1.5">
-          {HAIR_STYLES.map((h) => (
-            <button
-              key={h}
-              type="button"
-              role="radio"
-              aria-checked={appearance.hairStyle === h}
-              onClick={() => set({ hairStyle: h })}
-              className={cn("chip capitalize transition", appearance.hairStyle === h ? "border-accent bg-accent/10 text-ink" : "text-muted hover:text-ink")}
-            >
-              {h}
-            </button>
-          ))}
-        </div>
-      </Field>
-      <Field label="Hair color">
-        <ColorSwatches label="Hair color" colors={HAIR_COLORS} value={appearance.hairColor} onChange={(c) => c && set({ hairColor: c })} />
-      </Field>
-      <Field label="Outfit">
-        <ColorSwatches label="Outfit color" value={appearance.outfitColor} onChange={(c) => c && set({ outfitColor: c })} />
-      </Field>
-      <Field label="Accessory">
-        <div role="radiogroup" aria-label="Accessory" className="flex flex-wrap gap-1.5">
-          {ACCESSORIES.map((a) => (
-            <button
-              key={a}
-              type="button"
-              role="radio"
-              aria-checked={appearance.accessory === a}
-              onClick={() => set({ accessory: a })}
-              className={cn("chip transition", appearance.accessory === a ? "border-accent bg-accent/10 text-ink" : "text-muted hover:text-ink")}
-            >
-              {ACCESSORY_LABELS[a]}
-            </button>
-          ))}
-        </div>
-      </Field>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <span className="label">{label}</span>
-      {children}
-    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { getRepository } from "@/data";
+import { appearanceSchema } from "@/data/schema";
 import type {
   Activity,
   AppData,
@@ -53,7 +54,7 @@ export interface AppState extends AppData {
 
   // activities
   saveActivity(activity: Activity): void;
-  addActivity(input: Pick<Activity, "name" | "color" | "animation" | "areaId" | "areaType">): Activity;
+  addActivity(input: Pick<Activity, "name" | "color" | "animation" | "areaId" | "areaType"> & { style?: string }): Activity;
   removeActivity(id: string): void;
 
   // planner
@@ -202,7 +203,7 @@ export const useApp = create<AppState>()((set, get) => {
     saveActivity: (activity) => void put("activities", activity),
     addActivity(input) {
       const order = Math.max(0, ...get().activities.map((a) => a.order)) + 1;
-      return put("activities", { ...stamp(), key: `custom-${Date.now()}`, preset: false, order, ...input });
+      return put("activities", { ...stamp(), key: `custom-${Date.now()}`, preset: false, order, style: "auto", ...input });
     },
     removeActivity(id) {
       drop("activities", id);
@@ -326,7 +327,7 @@ function emptyData(): AppData {
     version: 1,
     profile: {
       characterName: "",
-      appearance: { skin: 1, hairStyle: "short", hairColor: "#4a3426", outfitColor: "#6e5ee6", accessory: "none" },
+      appearance: appearanceSchema.parse({}),
       onboarded: true,
       override: null,
       updatedAt: t,

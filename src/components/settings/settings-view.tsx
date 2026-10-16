@@ -12,7 +12,9 @@ import { toDateKey } from "@/lib/time";
 import { PageContainer, PageHeader } from "@/components/shell/page-header";
 import { ColorSwatches, Segmented } from "@/components/ui/controls";
 import { ConfirmDialog } from "@/components/ui/dialog";
-import { CharacterCreator } from "@/components/onboarding/onboarding";
+import { CharacterCreator } from "@/components/character/character-creator";
+import { routinesFor } from "@/island/character/routines";
+import { designFor } from "@/island/sprites/designs";
 import { BuildingPreview } from "@/components/island/building-preview";
 import { AreaSheet } from "@/components/island/area-sheet";
 import { AddAreaDialog } from "@/components/island/add-area-dialog";
@@ -181,10 +183,10 @@ function IslandSection() {
             {areas.map((a) => (
               <li key={a.id}>
                 <button onClick={() => selectArea(a.id)} className="flex w-full items-center gap-3 rounded-2xl border border-line/60 p-2 pr-3 text-left transition hover:bg-surface-2">
-                  <BuildingPreview type={a.type} variant={a.variant} color={a.color} className="h-[46px] w-[38px] shrink-0" />
+                  <BuildingPreview type={a.type} variant={a.variant} color={a.color} className="h-[44px] w-[56px] shrink-0" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{a.name}</span>
-                    <span className="block text-xs text-muted">{AREA_LABELS[a.type]}</span>
+                    <span className="block text-xs text-muted">{designFor(a.type, a.variant).name}</span>
                   </span>
                   <Pencil size={14} className="text-muted" aria-hidden />
                   <span className="sr-only">Edit {a.name}</span>
@@ -205,7 +207,19 @@ function ActivitiesSection() {
   const sorted = [...activities].sort((a, b) => a.order - b.order);
   const [confirm, setConfirm] = useState<Activity | null>(null);
   return (
-    <Section id="activities" title="Activities" description="What you plan, its color, where it happens on the island, and how your character acts it out.">
+    <Section
+      id="activities"
+      title="Activities"
+      description="What you plan, its color, where it happens on the island, and how your character does it. “Mix it up” rotates between ways (e.g. laps on the track or a run around the whole island)."
+    >
+      <div className="hidden items-center gap-3 px-5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted md:flex" aria-hidden>
+        <span className="w-7" />
+        <span className="w-64">Name</span>
+        <span className="ml-auto w-44">Happens at</span>
+        <span className="w-48">How it’s done</span>
+        <span className="w-36">Animation</span>
+        <span className="w-8" />
+      </div>
       <ul className="divide-y divide-line/60">
         {sorted.map((a) => (
           <ActivityRow key={a.id} activity={a} onDelete={() => setConfirm(a)} />
@@ -251,7 +265,7 @@ function ActivityRow({ activity, onDelete }: { activity: Activity; onDelete(): v
         </label>
         <SavedInput id={`act-name-${activity.id}`} value={activity.name} onSave={(name) => save({ name })} />
         <div className="ml-auto hidden items-center gap-2 md:flex">
-          <ActivitySelects activity={activity} areas={areas} linkValue={linkValue} save={save} />
+          <ActivitySelects activity={activity} areas={areas} linkValue={linkValue} save={save} idSuffix="d" />
         </div>
         {!activity.preset && (
           <button className="btn-ghost h-8 w-8 shrink-0 p-0 text-muted" onClick={onDelete} aria-label={`Delete ${activity.name}`}>
@@ -259,8 +273,8 @@ function ActivityRow({ activity, onDelete }: { activity: Activity; onDelete(): v
           </button>
         )}
       </div>
-      <div className="mt-2 flex gap-2 md:hidden">
-        <ActivitySelects activity={activity} areas={areas} linkValue={linkValue} save={save} />
+      <div className="mt-2 flex flex-wrap gap-2 md:hidden">
+        <ActivitySelects activity={activity} areas={areas} linkValue={linkValue} save={save} idSuffix="m" />
       </div>
       {open && (
         <div className="mt-3">
@@ -276,7 +290,9 @@ function ActivitySelects({
   areas,
   linkValue,
   save,
+  idSuffix,
 }: {
+  idSuffix: string;
   activity: Activity;
   areas: ReturnType<typeof useApp.getState>["areas"];
   linkValue: string;
@@ -284,11 +300,11 @@ function ActivitySelects({
 }) {
   return (
     <>
-      <label className="sr-only" htmlFor={`act-area-${activity.id}`}>
+      <label className="sr-only" htmlFor={`act-area-${activity.id}-${idSuffix}`}>
         Island area for {activity.name}
       </label>
       <select
-        id={`act-area-${activity.id}`}
+        id={`act-area-${activity.id}-${idSuffix}`}
         className="input h-9 w-full py-1 md:w-44"
         value={linkValue}
         onChange={(e) => {
@@ -306,14 +322,31 @@ function ActivitySelects({
           </option>
         ))}
       </select>
-      <label className="sr-only" htmlFor={`act-anim-${activity.id}`}>
+      <label className="sr-only" htmlFor={`act-style-${activity.id}-${idSuffix}`}>
+        How {activity.name} is done
+      </label>
+      <select
+        id={`act-style-${activity.id}-${idSuffix}`}
+        className="input h-9 w-full py-1 md:w-48"
+        value={activity.style}
+        onChange={(e) => save({ style: e.target.value })}
+        title="How your character does this activity"
+      >
+        <option value="auto">Mix it up (rotates)</option>
+        {routinesFor(activity.animation).map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.label}
+          </option>
+        ))}
+      </select>
+      <label className="sr-only" htmlFor={`act-anim-${activity.id}-${idSuffix}`}>
         Animation for {activity.name}
       </label>
       <select
-        id={`act-anim-${activity.id}`}
+        id={`act-anim-${activity.id}-${idSuffix}`}
         className="input h-9 w-full py-1 md:w-36"
         value={activity.animation}
-        onChange={(e) => save({ animation: e.target.value as AnimationKind })}
+        onChange={(e) => save({ animation: e.target.value as AnimationKind, style: "auto" })}
       >
         {ANIMATIONS.map((k) => (
           <option key={k} value={k}>

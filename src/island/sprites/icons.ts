@@ -9,6 +9,7 @@ export const ICONS = {
   camera: ["..kk...", "kkkkkkk", "kwkkkwk", "kkwakkk", "kkaakkk", "kkkkkkk", "......."],
   wrench: [".k...k.", ".kk.kk.", "..kkk..", "...k...", "...k...", "...k...", "..kkk.."],
   star: ["...k...", "..kak..", "kkaaakk", ".kaaak.", ".kakak.", "kk...kk", "......."],
+  note: ["...kkk.", "...k.k.", "...k...", "...k...", ".kkk...", "kkkk...", ".kk...."],
   flag: ["kaaaa..", "kaaaaa.", "kaaaa..", "k......", "k......", "k......", "k......"],
 } as const;
 

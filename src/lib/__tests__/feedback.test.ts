@@ -9,7 +9,7 @@ const areas: Area[] = [
   { ...meta("lib"), type: "library", name: "Library", color: null, variant: 0, x: -3, y: 1 },
 ];
 const activities: Activity[] = [
-  { ...meta("workout"), key: "workout", name: "Working out", color: "#e7795f", animation: "workout", areaType: "gym", areaId: null, preset: true, order: 0 },
+  { ...meta("workout"), key: "workout", name: "Working out", color: "#e7795f", animation: "workout", areaType: "gym", areaId: null, style: "auto", preset: true, order: 0 },
 ];
 const block = (date: string, done: boolean, start = 600, end = 660): Block => ({
   ...meta(`b-${date}-${start}`),
