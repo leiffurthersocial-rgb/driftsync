@@ -144,7 +144,9 @@ export const useApp = create<AppState>()((set, get) => {
 
     completeOnboarding({ characterName, islandName, appearance, areaTypes }) {
       saveSingleton("island", { ...get().island, name: islandName.trim() || "Driftsync" });
-      for (const t of areaTypes) get().addArea(t);
+      // Replaying onboarding keeps existing areas; only missing types are added.
+      const existing = new Set(get().areas.map((a) => a.type));
+      for (const t of areaTypes) if (!existing.has(t)) get().addArea(t);
       saveSingleton("profile", {
         ...get().profile,
         characterName: characterName.trim() || "Pip",

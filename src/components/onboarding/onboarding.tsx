@@ -56,7 +56,10 @@ export function Onboarding() {
   const [name, setName] = useState(profile.characterName === "Pip" ? "" : profile.characterName);
   const [islandName, setIslandName] = useState(island.name === "Driftsync" ? "" : island.name);
   const [appearance, setAppearance] = useState<Appearance>(profile.appearance);
-  const [areas, setAreas] = useState<AreaType[]>(DEFAULT_AREAS);
+  const existingAreas = useApp((s) => s.areas);
+  const [areas, setAreas] = useState<AreaType[]>(() =>
+    existingAreas.length ? [...new Set(existingAreas.map((a) => a.type))] : DEFAULT_AREAS,
+  );
 
   // Live preview island built exactly as the real placement will build it.
   const world = useMemo<SceneWorld>(() => {

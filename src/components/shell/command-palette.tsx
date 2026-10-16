@@ -178,6 +178,7 @@ export function CommandPalette() {
               <Search size={18} className="text-muted" aria-hidden />
               <input
                 ref={input}
+                autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -195,7 +196,7 @@ export function CommandPalette() {
                   }
                 }}
                 placeholder="Jump somewhere, or type a to-do…"
-                className="h-14 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70"
+                className="h-14 flex-1 bg-transparent text-base outline-none placeholder:text-muted/70 focus-visible:outline-none"
                 role="combobox"
                 aria-expanded="true"
                 aria-controls="palette-list"

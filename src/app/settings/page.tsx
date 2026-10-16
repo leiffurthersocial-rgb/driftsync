@@ -1,9 +1,5 @@
-import { PageContainer, PageHeader } from "@/components/shell/page-header";
+import { SettingsView } from "@/components/settings/settings-view";
 
 export default function SettingsPage() {
-  return (
-    <PageContainer>
-      <PageHeader title="Settings" subtitle="Coming together…" />
-    </PageContainer>
-  );
+  return <SettingsView />;
 }
