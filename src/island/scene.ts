@@ -399,7 +399,8 @@ export class IslandScene {
       if (q <= 0) return;
       const drop = intro < 1 ? Math.round((1 - easeOutBack(q)) * -70) : 0;
       items.push({
-        depth: pa.gx + pa.gy + 2.25,
+        // The track is a flat ground decal: anything standing on or behind it draws on top.
+        depth: area.type === "track" ? pa.gx + pa.gy - 1 : pa.gx + pa.gy + 2.25,
         draw: () => {
           w.globalAlpha = Math.min(1, q * 1.5);
           w.drawImage(sp.base.canvas, ox + isoX(pa.gx, pa.gy) - sp.base.ax, oy + isoY(pa.gx, pa.gy) - sp.base.ay + drop);

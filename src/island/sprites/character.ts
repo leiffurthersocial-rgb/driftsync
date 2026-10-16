@@ -286,10 +286,10 @@ function drawArms(arms: Arms, rect: Rect, outfit: string, outfitShade: string, s
       rect(11, 7, 1, 1, skin);
       return;
     case "holdHigh":
-      sleeve(4, 6, 5);
-      sleeve(11, 6, 5, outfitShade);
-      rect(4, 5, 1, 1, skin);
-      rect(11, 5, 1, 1, skin);
+      sleeve(3, 3, 9);
+      sleeve(12, 3, 9, outfitShade);
+      rect(3, 2, 1, 1, skin);
+      rect(12, 2, 1, 1, skin);
       return;
     case "wave":
       sleeve(4, 11, 3);
@@ -353,9 +353,9 @@ function drawProp(p: HeldProp, rect: Rect, px: Px) {
       px(9, 15, "#4b4458");
       return;
     case "dumbbellUp":
-      rect(2, 4, 12, 1, "#6b6478");
-      rect(1, 3, 2, 3, "#4b4458");
-      rect(13, 3, 2, 3, "#4b4458");
+      rect(1, 1, 14, 1, "#6b6478");
+      rect(0, -1, 2, 5, "#4b4458");
+      rect(14, -1, 2, 5, "#4b4458");
       return;
     case "dumbbellDown":
       rect(2, 12, 12, 1, "#6b6478");
@@ -460,7 +460,15 @@ export const ANIMATIONS: Record<AnimName, Animation> = {
   stretch: { fps: 2, frames: [P("stand", "up", "closed", { bob: -1 }), P("stand", "up", "happy", { bob: -1 }), P("stand", "down", "open")] },
   sit: { fps: 2, frames: [P("sit", "hold", "open"), P("sit", "hold", "open"), P("sit", "hold", "open"), P("sit", "hold", "closed")] },
   walk: { fps: 8, frames: [P("walkA", "swingA", "open"), P("stand", "down", "open", { bob: -1 }), P("walkB", "swingB", "open"), P("stand", "down", "open", { bob: -1 })] },
-  jog: { fps: 10, frames: [P("runA", "swingB", "open", { bob: -1 }), P("stand", "down", "open"), P("runB", "swingA", "open", { bob: -1 }), P("stand", "down", "open")] },
+  jog: {
+    fps: 10,
+    frames: [
+      P("runA", "swingB", "open", { bob: -1 }),
+      P("walkA", "swingB", "open"),
+      P("runB", "swingA", "open", { bob: -1 }),
+      P("walkB", "swingA", "open"),
+    ],
+  },
   study: {
     fps: 3,
     frames: [

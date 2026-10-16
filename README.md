@@ -131,5 +131,5 @@ The switch already exists: `NEXT_PUBLIC_DRIFTSYNC_STORAGE=supabase` makes `getRe
 - **"Send to" beats the plan.** A manual send-to wins over your time blocks until you clear it, or until a new block starts after you sent it. That matches "do that instead until I clear it" without stranding your plan forever.
 - **Habit goals count done blocks only.** Frequency goals ("jog 3× a week") count planner blocks of that activity that you mark done. Island "lived in" feedback also gives partial credit to past blocks you didn't tick.
 - **Overlaps are allowed** and shown side by side with a small warning marker instead of being blocked.
-- **Touch:** drag on empty timeline space scrolls; tap creates a block; long-press a block to move it. Resize handles respond immediately. Dragging a to-do onto the timeline uses HTML5 drag and drop (desktop). On touch, use the calendar button next to the to-do, which schedules it in the next free slot.
-- **Not done yet:** Supabase sync and auth (stub only), and multi-day/week views.
+- **Touch:** dragging on empty timeline space scrolls, and tapping creates a block. Long-press a block to move it; resize handles respond immediately. To-dos use HTML5 drag and drop with a mouse, and long-press then drag on touch or pen (a floating preview plus a drop-time indicator). The calendar button schedules a to-do into the next free slot.
+- **Out of scope for now:** Supabase sync (stub plus wiring guide above), auth (the brief says not yet), and multi-day/week planner views.

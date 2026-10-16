@@ -1,7 +1,8 @@
 "use client";
 
 import { CalendarClock, GripVertical, Inbox, LayoutTemplate } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useApp } from "@/store/app-store";
 import { EmptyState } from "@/components/ui/controls";
 import { formatDateShort } from "@/lib/time";
@@ -9,15 +10,35 @@ import { TODO_DRAG_TYPE } from "./timeline";
 import { cn } from "@/lib/cn";
 
 /** Open to-dos you can drag onto the timeline (or schedule with a button), plus templates. */
+const LONG_PRESS_MS = 280;
+
 export function PlannerSide({
   date,
   onSchedule,
   onApplyTemplate,
+  onPointerDragMove,
+  onPointerDragEnd,
 }: {
   date: string;
   onSchedule(todoId: string): void;
   onApplyTemplate(id: string): void;
+  /** Touch/pen drag: hovering a viewport point. */
+  onPointerDragMove(x: number, y: number): void;
+  /** Touch/pen drag: released at a viewport point. */
+  onPointerDragEnd(todoId: string, x: number, y: number): void;
 }) {
+  // Touch and pen can't use HTML5 drag and drop, so long-press starts a pointer-driven drag.
+  const [ghost, setGhost] = useState<{ id: string; title: string; x: number; y: number } | null>(null);
+  const press = useRef<{ id: string; title: string; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const [coarse, setCoarse] = useState(false);
+  useEffect(() => setCoarse(window.matchMedia("(pointer: coarse)").matches), []);
+  useEffect(() => {
+    if (!ghost) return;
+    const block = (e: TouchEvent) => e.preventDefault();
+    document.addEventListener("touchmove", block, { passive: false });
+    return () => document.removeEventListener("touchmove", block);
+  }, [ghost]);
+
   const todos = useApp((s) => s.todos);
   const templates = useApp((s) => s.templates);
   const blocks = useApp((s) => s.blocks);
@@ -38,7 +59,7 @@ export function PlannerSide({
           <h2 id="side-todos" className="text-sm font-semibold">
             To-dos
           </h2>
-          <span className="hidden text-xs text-muted lg:inline">Drag onto the timeline</span>
+          <span className="hidden text-xs text-muted lg:inline">{coarse ? "Hold, then drag onto the timeline" : "Drag onto the timeline"}</span>
         </div>
         {open.length === 0 ? (
           <EmptyState icon={<Inbox size={20} />} title="All clear">
@@ -49,7 +70,55 @@ export function PlannerSide({
             {open.map((t) => (
               <li
                 key={t.id}
-                draggable
+                draggable={!coarse}
+                onPointerDown={(e) => {
+                  if (e.pointerType === "mouse" || (e.target as HTMLElement).closest("button")) return;
+                  const target = e.currentTarget;
+                  const { clientX: x, clientY: y, pointerId } = e;
+                  press.current = {
+                    id: t.id,
+                    title: t.title,
+                    x,
+                    y,
+                    timer: setTimeout(() => {
+                      try {
+                        target.setPointerCapture(pointerId);
+                      } catch {
+                        /* pointer gone */
+                      }
+                      navigator.vibrate?.(8);
+                      setGhost({ id: t.id, title: t.title, x, y });
+                    }, LONG_PRESS_MS),
+                  };
+                }}
+                onPointerMove={(e) => {
+                  const p = press.current;
+                  if (!p) return;
+                  if (!ghost) {
+                    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) {
+                      clearTimeout(p.timer);
+                      press.current = null;
+                    }
+                    return;
+                  }
+                  setGhost({ ...ghost, x: e.clientX, y: e.clientY });
+                  onPointerDragMove(e.clientX, e.clientY);
+                }}
+                onPointerUp={(e) => {
+                  const p = press.current;
+                  if (p) clearTimeout(p.timer);
+                  press.current = null;
+                  if (ghost) onPointerDragEnd(ghost.id, e.clientX, e.clientY);
+                  setGhost(null);
+                }}
+                onPointerCancel={() => {
+                  if (press.current) clearTimeout(press.current.timer);
+                  press.current = null;
+                  if (ghost) onPointerDragMove(-1, -1);
+                  setGhost(null);
+                }}
+                onContextMenu={(e) => coarse && e.preventDefault()}
+                style={{ touchAction: ghost?.id === t.id ? "none" : "pan-y", WebkitUserSelect: "none" }}
                 onDragStart={(e) => {
                   e.dataTransfer.setData(TODO_DRAG_TYPE, t.id);
                   e.dataTransfer.setData("text/plain", t.title);
@@ -97,6 +166,17 @@ export function PlannerSide({
           </ul>
         )}
       </section>
+      {ghost &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[70] max-w-[220px] -translate-x-1/2 -translate-y-[130%] truncate rounded-xl border border-accent/40 bg-surface px-3 py-2 text-sm font-medium shadow-float"
+            style={{ left: ghost.x, top: ghost.y }}
+            aria-hidden
+          >
+            {ghost.title}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

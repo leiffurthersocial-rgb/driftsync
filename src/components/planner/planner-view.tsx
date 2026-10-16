@@ -52,6 +52,8 @@ export function PlannerView() {
   const [clearOpen, setClearOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const timeline = useRef<TimelineHandle>(null);
+  const [coarse, setCoarse] = useState(false);
+  useEffect(() => setCoarse(window.matchMedia("(pointer: coarse)").matches), []);
 
   const allBlocks = useApp((s) => s.blocks);
   const activities = useApp((s) => s.activities);
@@ -291,12 +293,22 @@ export function PlannerView() {
             <div className="pointer-events-none absolute inset-x-0 top-1/3 flex justify-center px-6">
               <div className="rounded-2xl bg-surface/90 px-5 py-4 text-center shadow-soft backdrop-blur">
                 <p className="font-medium">An open day</p>
-                <p className="mt-1 text-sm text-muted">Drag on the timeline to add a block, press N, or apply a template from ⋯</p>
+                <p className="mt-1 text-sm text-muted">{coarse ? "Tap the timeline to add a block, or apply a template from ⋯" : "Drag on the timeline to add a block, press N, or apply a template from ⋯"}</p>
               </div>
             </div>
           )}
         </div>
-        <PlannerSide date={date} onSchedule={(id) => scheduleTodo(id)} onApplyTemplate={applyTemplate} />
+        <PlannerSide
+          date={date}
+          onSchedule={(id) => scheduleTodo(id)}
+          onApplyTemplate={applyTemplate}
+          onPointerDragMove={(x, y) => timeline.current?.previewDrop(timeline.current.minuteAtPoint(x, y))}
+          onPointerDragEnd={(id, x, y) => {
+            const minute = timeline.current?.minuteAtPoint(x, y) ?? null;
+            timeline.current?.previewDrop(null);
+            if (minute !== null) scheduleTodo(id, minute);
+          }}
+        />
       </div>
 
       <BlockEditor blockId={editing?.id ?? null} isNew={!!editing?.isNew} onClose={() => setEditing(null)} />

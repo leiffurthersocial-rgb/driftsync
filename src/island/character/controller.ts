@@ -9,7 +9,7 @@ import { characterSprite, frameAt, type AnimName } from "../sprites/character";
 import { TRACK_LOOP } from "../sprites/buildings";
 
 const WALK_SPEED = 1.9; // tiles / second
-const JOG_SPEED = 0.95; // radians / second around the track
+const JOG_SPEED = 1.4; // radians / second around the track
 
 const ANIM_FOR: Record<AnimationKind, AnimName> = {
   study: "study",

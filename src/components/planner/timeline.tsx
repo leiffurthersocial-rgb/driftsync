@@ -44,6 +44,10 @@ interface Props {
 
 export interface TimelineHandle {
   scrollToMinute(minute: number): void;
+  /** Snapped minute under a viewport point, or null when the point is outside the timeline. */
+  minuteAtPoint(clientX: number, clientY: number): number | null;
+  /** Show (or clear) the drop indicator, for pointer-driven to-do drags. */
+  previewDrop(minute: number | null): void;
 }
 
 type Drag =
@@ -84,6 +88,14 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
       const el = scroller.current;
       if (!el) return;
       el.scrollTo({ top: Math.max(0, (minute - range.start) * PPM - el.clientHeight * 0.3), behavior: "smooth" });
+    },
+    minuteAtPoint(clientX: number, clientY: number) {
+      const view = scroller.current?.getBoundingClientRect();
+      if (!view || clientX < view.left || clientX > view.right || clientY < view.top || clientY > view.bottom) return null;
+      return Math.min(Math.max(range.start, snapDown(minuteAt(clientY))), range.end - 15);
+    },
+    previewDrop(minute: number | null) {
+      setDropMinute(minute);
     },
   }));
 
