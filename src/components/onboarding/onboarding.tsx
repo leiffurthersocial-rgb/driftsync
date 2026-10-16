@@ -102,7 +102,7 @@ export function Onboarding() {
   const next = () => (step < STEPS.length - 1 ? setStep(step + 1) : finish());
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
+    <main className="fixed inset-0 overflow-hidden" aria-label="Welcome to Driftsync">
       <motion.div
         className="absolute inset-0 md:left-[440px]"
         initial={reduced ? false : { y: 220, opacity: 0, scale: 0.9 }}
@@ -242,7 +242,7 @@ export function Onboarding() {
           </div>
         </motion.section>
       </div>
-    </div>
+    </main>
   );
 }
 

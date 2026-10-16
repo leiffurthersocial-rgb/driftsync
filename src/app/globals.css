@@ -10,12 +10,12 @@
   --surface-2: 240 234 224;
   --line: 226 218 205;
   --ink: 43 37 64;
-  --muted: 112 104 130;
+  --muted: 98 90 118;
   --accent: 110 94 230;
   --accent-ink: 255 255 255;
   --sage: 110 168 120;
-  --peach: 236 146 110;
-  --danger: 210 84 84;
+  --peach: 176 92 56;
+  --danger: 182 60 60;
   --shadow: 60 40 90;
   color-scheme: light;
 }
@@ -77,7 +77,7 @@ body {
     @apply btn bg-surface-2 text-ink hover:bg-line/60;
   }
   .btn-danger {
-    @apply btn bg-danger text-white hover:brightness-110;
+    @apply btn bg-[#c24545] text-white hover:brightness-110;
   }
   .input {
     @apply w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted/70

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { cloneElement, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export interface MenuItem {
@@ -21,7 +21,8 @@ export function Menu({
   align = "end",
   className,
 }: {
-  trigger: ReactNode;
+  /** A single button element; it receives the toggle handler and ARIA state. */
+  trigger: ReactElement<{ onClick?: () => void; "aria-haspopup"?: string; "aria-expanded"?: boolean }>;
   items: (MenuItem | "divider" | { heading: string })[];
   label: string;
   align?: "start" | "end";
@@ -60,9 +61,8 @@ export function Menu({
 
   return (
     <div ref={root} className={cn("relative", className)}>
-      <div onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open}>
-        {trigger}
-      </div>
+      {isValidElement(trigger) &&
+        cloneElement(trigger, { onClick: () => setOpen((o) => !o), "aria-haspopup": "menu", "aria-expanded": open })}
       <AnimatePresence>
         {open && (
           <motion.div

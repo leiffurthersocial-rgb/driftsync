@@ -240,7 +240,7 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
   const activityOf = (id: string | null) => activities.find((a) => a.id === id);
 
   return (
-    <div ref={scroller} className="relative h-full overflow-y-auto overscroll-contain" tabIndex={-1}>
+    <div ref={scroller} className="relative h-full overflow-y-auto overscroll-contain rounded-xl" tabIndex={0} aria-label="Day timeline, scrollable">
       <div
         ref={surface}
         className="relative select-none"
