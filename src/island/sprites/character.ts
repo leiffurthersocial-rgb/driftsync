@@ -512,5 +512,6 @@ export const ANIMATIONS: Record<AnimName, Animation> = {
 
 export function frameAt(anim: AnimName, timeSec: number): Pose {
   const a = ANIMATIONS[anim];
-  return a.frames[Math.floor(timeSec * a.fps) % a.frames.length];
+  const i = Math.floor(Math.max(0, timeSec) * a.fps) % a.frames.length;
+  return a.frames[i];
 }

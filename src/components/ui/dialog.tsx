@@ -2,7 +2,8 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 
 /** Open dialogs, top-most last; only the top one handles Esc/Tab. */
@@ -71,8 +72,13 @@ export function Dialog({ open, onClose, title, description, children, footer, va
     };
   }, [open]);
 
+  // Portal to <body> so transformed ancestors (page transitions) can't trap position: fixed.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
   const sheet = variant === "sheet";
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div className={cn("fixed inset-0 z-50 flex", sheet ? "items-end sm:items-stretch sm:justify-end" : "items-center justify-center p-4")}>
@@ -123,7 +129,8 @@ export function Dialog({ open, onClose, title, description, children, footer, va
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

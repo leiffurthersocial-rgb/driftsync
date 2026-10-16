@@ -1,9 +1,10 @@
-import { PageContainer, PageHeader } from "@/components/shell/page-header";
+import { Suspense } from "react";
+import { PlannerView } from "@/components/planner/planner-view";
 
 export default function PlannerPage() {
   return (
-    <PageContainer>
-      <PageHeader title="Planner" subtitle="Coming together…" />
-    </PageContainer>
+    <Suspense>
+      <PlannerView />
+    </Suspense>
   );
 }
