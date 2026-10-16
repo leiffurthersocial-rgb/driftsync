@@ -5,6 +5,9 @@ import { X } from "lucide-react";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
+/** Open dialogs, top-most last; only the top one handles Esc/Tab. */
+const stack: symbol[] = [];
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -30,6 +33,8 @@ export function Dialog({ open, onClose, title, description, children, footer, va
 
   useEffect(() => {
     if (!open) return;
+    const me = Symbol("dialog");
+    stack.push(me);
     const prev = document.activeElement as HTMLElement | null;
     const t = setTimeout(() => {
       const el = panel.current;
@@ -38,6 +43,7 @@ export function Dialog({ open, onClose, title, description, children, footer, va
       (auto ?? el).focus();
     }, 30);
     const onKey = (e: KeyboardEvent) => {
+      if (stack[stack.length - 1] !== me) return;
       if (e.key === "Escape") {
         e.stopPropagation();
         onCloseRef.current();
@@ -59,6 +65,7 @@ export function Dialog({ open, onClose, title, description, children, footer, va
     document.addEventListener("keydown", onKey, true);
     return () => {
       clearTimeout(t);
+      stack.splice(stack.indexOf(me), 1);
       document.removeEventListener("keydown", onKey, true);
       prev?.focus?.();
     };

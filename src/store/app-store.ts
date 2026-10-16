@@ -343,3 +343,7 @@ function emptyData(): AppData {
 
 /** Helper for "copy yesterday". */
 export const yesterdayOf = (date: string) => addDays(date, -1);
+
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  (window as unknown as { __driftsync: typeof useApp }).__driftsync = useApp;
+}

@@ -1,9 +1,5 @@
-import { PageContainer, PageHeader } from "@/components/shell/page-header";
+import { IslandView } from "@/components/island/island-view";
 
 export default function IslandPage() {
-  return (
-    <PageContainer>
-      <PageHeader title="Island" subtitle="Your island is drifting in…" />
-    </PageContainer>
-  );
+  return <IslandView />;
 }
