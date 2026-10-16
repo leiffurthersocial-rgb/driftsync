@@ -166,11 +166,13 @@ export function IslandView() {
 
       {/* Mobile HUD */}
       <div className="absolute inset-x-3 bottom-[5.25rem] flex flex-col gap-2 md:hidden">
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <CharacterChip name={profile.characterName} status={status} onClick={() => openCharacter(true)} compact />
+          <div className="min-w-0 flex-1">
+            <AreaDock />
+          </div>
         </div>
-        <AreaDock />
-        <NowCard now={now} />
+        <NowCard now={now} compact />
         <QuickAddTodo />
       </div>
 
@@ -183,6 +185,19 @@ export function IslandView() {
 
 function CharacterChip({ name, status, onClick, compact }: { name: string; status: string; onClick(): void; compact?: boolean }) {
   const appearance = useApp((s) => s.profile.appearance);
+  if (compact)
+    return (
+      <button
+        onClick={onClick}
+        aria-label={`${name}: ${status}. Open character card`}
+        className="card flex shrink-0 items-center gap-2 bg-surface/85 py-1 pl-1 pr-3 backdrop-blur-md"
+      >
+        <span className="grid h-7 w-7 place-items-center overflow-hidden rounded-lg bg-surface-2">
+          <CharacterPreview appearance={appearance} scale={1} className="mt-2 h-[30px] w-6" />
+        </span>
+        <span className="text-sm font-medium">{name}</span>
+      </button>
+    );
   return (
     <button
       onClick={onClick}

@@ -125,3 +125,11 @@ The switch already exists: `NEXT_PUBLIC_DRIFTSYNC_STORAGE=supabase` makes `getRe
 - `⌘/Ctrl + K`: command palette (navigate, add a to-do, send your character somewhere, add an area, switch theme)
 - Planner: `N` new block, `T`/`M` today/tomorrow, `←`/`→` change day, `↑`/`↓` move the selected block, `Shift+↑/↓` resize, `D` done, `Delete` remove, `?` help
 - To-dos: `/` focus the add field, `Alt+↑/↓` reorder
+
+## Decisions and known limitations
+
+- **"Send to" beats the plan.** A manual send-to wins over your time blocks until you clear it, or until a new block starts after you sent it. That matches "do that instead until I clear it" without stranding your plan forever.
+- **Habit goals count done blocks only.** Frequency goals ("jog 3× a week") count planner blocks of that activity that you mark done. Island "lived in" feedback also gives partial credit to past blocks you didn't tick.
+- **Overlaps are allowed** and shown side by side with a small warning marker instead of being blocked.
+- **Touch:** drag on empty timeline space scrolls; tap creates a block; long-press a block to move it. Resize handles respond immediately. Dragging a to-do onto the timeline uses HTML5 drag and drop (desktop). On touch, use the calendar button next to the to-do, which schedules it in the next free slot.
+- **Not done yet:** Supabase sync and auth (stub only), and multi-day/week views.

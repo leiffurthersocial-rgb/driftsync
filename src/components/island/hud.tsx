@@ -27,11 +27,41 @@ export function IslandTitle({ now }: { now: Date }) {
   );
 }
 
-export function NowCard({ now }: { now: Date }) {
+export function NowCard({ now, compact }: { now: Date; compact?: boolean }) {
   const { active, next, minute } = useCurrentBlocks(now);
   const activities = useApp((s) => s.activities);
   const clock = useApp((s) => s.settings.clock);
   const act = (id: string | null) => activities.find((a) => a.id === id) ?? null;
+
+  if (compact) {
+    const b = active ?? next;
+    const color = b ? blockColor(b, act(b.activityId)) : "rgb(var(--muted))";
+    return (
+      <Link
+        href="/planner?day=today"
+        aria-label="Open today's plan"
+        className="card relative flex items-center gap-3 overflow-hidden bg-surface/85 px-4 py-3 backdrop-blur-md"
+      >
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted">{active ? "Now" : next ? "Next" : "Now"}</span>
+          <span className="block truncate text-sm font-medium">
+            {b ? b.title || act(b.activityId)?.name || "Planned time" : "Nothing planned — drift a little"}
+          </span>
+        </span>
+        <span className="shrink-0 text-xs text-muted">
+          {active ? `${formatDuration(active.end - minute)} left` : next ? formatMinutes(next.start, clock) : "Plan →"}
+        </span>
+        {active && (
+          <span
+            className="absolute bottom-0 left-0 h-0.5"
+            style={{ width: `${((minute - active.start) / (active.end - active.start)) * 100}%`, background: color }}
+            aria-hidden
+          />
+        )}
+      </Link>
+    );
+  }
 
   return (
     <motion.section

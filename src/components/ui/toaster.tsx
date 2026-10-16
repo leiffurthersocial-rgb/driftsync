@@ -9,7 +9,7 @@ export function Toaster() {
   const dismiss = useUi((s) => s.dismissToast);
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex flex-col items-center gap-2 px-4 md:bottom-[5.5rem]"
+      className="pointer-events-none fixed inset-x-0 top-[4.5rem] z-[60] flex flex-col items-center gap-2 px-4 md:bottom-[5.5rem] md:top-auto"
       role="status"
       aria-live="polite"
     >

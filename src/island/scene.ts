@@ -170,11 +170,16 @@ export class IslandScene {
     }
     const { width, height } = this.metrics;
     const narrow = rect.width < 640;
-    const fit = Math.min((w * (narrow ? 0.98 : 0.86)) / width, (h * (narrow ? 0.6 : 0.86)) / height);
+    // The island is round, so the grid diamond's corners are empty: fit to the visible content width.
+    const contentWidth = (this.data?.layout.size ?? 12) * 24 + 40;
+    const fit = Math.min((w * (narrow ? 0.96 : 0.86)) / contentWidth, (h * (narrow ? 0.5 : 0.86)) / height);
     // Integer scaling keeps pixels perfectly square; below 2x allow half steps so small screens still fill.
-    this.scale = fit >= 2 ? Math.floor(fit) : fit >= 1 ? Math.floor(fit * 2) / 2 : fit;
+    // On dense screens a quarter-step scale is visually indistinguishable from integer scaling.
+    const step = this.dpr >= 2 ? 4 : 2;
+    this.scale = fit >= 3 ? Math.floor(fit) : fit >= 1 ? Math.floor(fit * step) / step : fit;
     this.offX = Math.round((w - width * this.scale) / 2);
-    this.offY = Math.round((h - height * this.scale) / 2 - h * (narrow ? 0.06 : 0.01));
+    // On phones the HUD covers the lower third, so center the island in the space above it.
+    this.offY = Math.round((narrow ? h * 0.42 : h * 0.49) - (height * this.scale) / 2);
   }
 
   start() {
