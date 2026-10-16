@@ -21,6 +21,10 @@ interface UiState {
   addAreaOpen: boolean;
   setAddAreaOpen(open: boolean): void;
 
+  /** Set by onboarding so the island plays its assemble animation once. */
+  introPending: boolean;
+  setIntroPending(v: boolean): void;
+
   toasts: Toast[];
   toast(message: string, opts?: Omit<Toast, "id" | "message">): void;
   dismissToast(id: number): void;
@@ -38,6 +42,9 @@ export const useUi = create<UiState>()((set, get) => ({
   setCharacterCardOpen: (characterCardOpen) => set({ characterCardOpen, selectedAreaId: null }),
   addAreaOpen: false,
   setAddAreaOpen: (addAreaOpen) => set({ addAreaOpen }),
+
+  introPending: false,
+  setIntroPending: (introPending) => set({ introPending }),
 
   toasts: [],
   toast(message, opts = {}) {
