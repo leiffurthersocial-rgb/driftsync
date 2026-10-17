@@ -2,7 +2,6 @@ import { createDefaultData } from "./defaults";
 import {
   CURRENT_VERSION,
   collectionSchemas,
-  islandSchema,
   profileSchema,
   settingsSchema,
   type AppData,
@@ -58,6 +57,26 @@ export const migrations: Record<number, Migration> = {
       out.activities = data.activities.map((x) => (isObject(x) && typeof x.style !== "string" ? { ...x, style: "auto" } : x));
     return out;
   },
+  /**
+   * v2 → v3: the island and character are gone. The character's name becomes your name (unless it
+   * was the default "Pip"), island themes map onto light/dark, and island-only fields are dropped.
+   */
+  2: (data) => {
+    const out: Raw = { ...data, version: 3 };
+    delete out.island;
+    delete out.areas;
+    if (isObject(data.profile)) {
+      const { characterName, onboarded, updatedAt } = data.profile;
+      const name = typeof characterName === "string" && characterName !== "Pip" ? characterName : "";
+      out.profile = { name, onboarded, updatedAt };
+    }
+    if (isObject(data.settings)) {
+      const map: Record<string, string> = { day: "light", retro: "light", dusk: "dark" };
+      const theme = data.settings.theme;
+      if (typeof theme === "string" && map[theme]) out.settings = { ...data.settings, theme: map[theme] };
+    }
+    return out;
+  },
 };
 
 /** Validate a collection, dropping only the records that fail rather than the whole dataset. */
@@ -102,9 +121,7 @@ export function migrate(input: unknown): AppData {
   return {
     version: CURRENT_VERSION,
     profile: singleton(profileSchema, data.profile, defaults.profile),
-    island: singleton(islandSchema, data.island, defaults.island),
     settings: singleton(settingsSchema, data.settings, defaults.settings),
-    areas: parseCollection(data.areas, "areas", []),
     // An empty activity list would break the planner, so fall back to presets.
     activities: activities.length ? activities : defaults.activities,
     blocks: parseCollection(data.blocks, "blocks", []),

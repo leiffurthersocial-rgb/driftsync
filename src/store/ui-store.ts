@@ -13,18 +13,6 @@ interface UiState {
   paletteOpen: boolean;
   setPaletteOpen(open: boolean): void;
 
-  /** Island selection & panels. */
-  selectedAreaId: string | null;
-  selectArea(id: string | null): void;
-  characterCardOpen: boolean;
-  setCharacterCardOpen(open: boolean): void;
-  addAreaOpen: boolean;
-  setAddAreaOpen(open: boolean): void;
-
-  /** Set by onboarding so the island plays its assemble animation once. */
-  introPending: boolean;
-  setIntroPending(v: boolean): void;
-
   toasts: Toast[];
   toast(message: string, opts?: Omit<Toast, "id" | "message">): void;
   dismissToast(id: number): void;
@@ -35,16 +23,6 @@ let toastId = 0;
 export const useUi = create<UiState>()((set, get) => ({
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
-
-  selectedAreaId: null,
-  selectArea: (selectedAreaId) => set({ selectedAreaId, characterCardOpen: false }),
-  characterCardOpen: false,
-  setCharacterCardOpen: (characterCardOpen) => set({ characterCardOpen, selectedAreaId: null }),
-  addAreaOpen: false,
-  setAddAreaOpen: (addAreaOpen) => set({ addAreaOpen }),
-
-  introPending: false,
-  setIntroPending: (introPending) => set({ introPending }),
 
   toasts: [],
   toast(message, opts = {}) {

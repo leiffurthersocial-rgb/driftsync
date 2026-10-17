@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayLight, lightFor } from "../daycycle";
+import { dayLight, isDark } from "../daycycle";
 
 describe("dayLight", () => {
   it("is bright at noon and dark at midnight", () => {
@@ -16,7 +16,10 @@ describe("dayLight", () => {
     expect(dayLight(18 * 60 + 45).golden).toBeGreaterThan(0.9);
   });
   it("honours fixed themes", () => {
-    expect(lightFor("day", 0).night).toBe(0);
-    expect(lightFor("dusk", 12 * 60).night).toBeGreaterThan(0.5);
+    expect(isDark("light", 0)).toBe(false);
+    expect(isDark("dark", 12 * 60)).toBe(true);
+    expect(isDark("system", 12 * 60, true)).toBe(true);
+    expect(isDark("auto", 12 * 60)).toBe(false);
+    expect(isDark("auto", 23 * 60)).toBe(true);
   });
 });

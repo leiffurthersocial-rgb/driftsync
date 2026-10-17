@@ -1,28 +1,20 @@
 "use client";
 
-import { Download, Pencil, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
+import { Download, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ANIMATIONS, type Activity, type AnimationKind, type ThemeSetting } from "@/data/schema";
+import type { Activity, ThemeSetting } from "@/data/schema";
 import type { ResetScope } from "@/data/reset";
 import { useApp } from "@/store/app-store";
-import { toast, useUi } from "@/store/ui-store";
-import { AREA_LABELS } from "@/lib/activities";
-import { ANIMATION_VERB } from "@/lib/character-intent";
+import { toast } from "@/store/ui-store";
 import { toDateKey } from "@/lib/time";
 import { PageContainer, PageHeader } from "@/components/shell/page-header";
 import { ColorSwatches, Segmented } from "@/components/ui/controls";
 import { ConfirmDialog } from "@/components/ui/dialog";
-import { CharacterCreator } from "@/components/character/character-creator";
-import { routinesFor } from "@/island/character/routines";
-import { designFor } from "@/island/sprites/designs";
-import { BuildingPreview } from "@/components/island/building-preview";
-import { AreaSheet } from "@/components/island/area-sheet";
-import { AddAreaDialog } from "@/components/island/add-area-dialog";
 import { cn } from "@/lib/cn";
 
 const SECTIONS = [
   ["profile", "Profile"],
-  ["island", "Island"],
+  ["appearance", "Appearance"],
   ["activities", "Activities"],
   ["planner", "Planner"],
   ["data", "Data"],
@@ -67,7 +59,7 @@ export function SettingsView() {
         </nav>
         <div className="min-w-0 space-y-8">
           <ProfileSection />
-          <IslandSection />
+          <AppearanceSection />
           <ActivitiesSection />
           <PlannerSection />
           <DataSection />
@@ -105,7 +97,19 @@ function Row({ label, hint, children, htmlFor }: { label: string; hint?: string;
 }
 
 /** Text input that saves on blur/Enter. */
-function SavedInput({ id, value, onSave, placeholder }: { id: string; value: string; onSave(v: string): void; placeholder?: string }) {
+function SavedInput({
+  id,
+  value,
+  onSave,
+  placeholder,
+  allowEmpty,
+}: {
+  id: string;
+  value: string;
+  onSave(v: string): void;
+  placeholder?: string;
+  allowEmpty?: boolean;
+}) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return (
@@ -116,88 +120,47 @@ function SavedInput({ id, value, onSave, placeholder }: { id: string; value: str
       maxLength={40}
       placeholder={placeholder}
       onChange={(e) => setV(e.target.value)}
-      onBlur={() => v.trim() && v.trim() !== value && onSave(v.trim())}
+      onBlur={() => (v.trim() || allowEmpty) && v.trim() !== value && onSave(v.trim())}
       onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
     />
   );
 }
 
 function ProfileSection() {
-  const profile = useApp((s) => s.profile);
-  const islandName = useApp((s) => s.island.name);
-  const { updateProfile, updateIsland, updateAppearance } = useApp.getState();
+  const name = useApp((s) => s.profile.name);
   return (
-    <Section id="profile" title="Profile" description="Your character and your island.">
-      <Row label="Character name" htmlFor="set-name">
-        <SavedInput id="set-name" value={profile.characterName} onSave={(characterName) => updateProfile({ characterName })} />
+    <Section id="profile" title="Profile">
+      <Row label="Your name" hint="Used for greetings on the Today page. Leave empty for none." htmlFor="set-name">
+        <SavedInput id="set-name" value={name} allowEmpty placeholder="Optional" onSave={(name) => useApp.getState().updateProfile({ name })} />
       </Row>
-      <Row label="Island name" htmlFor="set-island">
-        <SavedInput id="set-island" value={islandName} onSave={(name) => updateIsland({ name })} />
-      </Row>
-      <div className="px-5 py-4">
-        <p className="mb-3 text-sm font-medium">Appearance</p>
-        <CharacterCreator compact appearance={profile.appearance} name={profile.characterName} onChange={(a) => updateAppearance(a)} />
-      </div>
     </Section>
   );
 }
 
 const THEME_COPY: Record<ThemeSetting, string> = {
-  auto: "Follows your local time: pastel days, lofi dusk evenings.",
-  day: "Always sunny and pastel.",
-  dusk: "Always the cozy purple evening.",
-  retro: "Bright, saturated retro palette.",
+  auto: "Light during the day, dark in the evening, following your local time.",
+  system: "Matches your device's light or dark setting.",
+  light: "Always light.",
+  dark: "Always dark.",
 };
 
-function IslandSection() {
-  const areas = useApp((s) => s.areas);
+function AppearanceSection() {
   const theme = useApp((s) => s.settings.theme);
-  const selectArea = useUi((s) => s.selectArea);
-  const openAdd = useUi((s) => s.setAddAreaOpen);
   return (
-    <Section id="island" title="Island" description="Areas and how your island looks.">
+    <Section id="appearance" title="Appearance">
       <Row label="Theme" hint={THEME_COPY[theme]}>
         <Segmented
           label="Theme"
           value={theme}
           onChange={(t) => useApp.getState().updateSettings({ theme: t })}
           options={[
-            { value: "auto", label: "Auto" },
-            { value: "day", label: "Day" },
-            { value: "dusk", label: "Dusk" },
-            { value: "retro", label: "Retro" },
+            { value: "auto", label: "Time of day" },
+            { value: "system", label: "Device" },
+            { value: "light", label: "Light" },
+            { value: "dark", label: "Dark" },
           ]}
         />
       </Row>
-      <div className="px-5 py-4">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-medium">Areas</p>
-          <button className="btn-soft h-8 px-3" onClick={() => openAdd(true)}>
-            <Plus size={15} /> Add area
-          </button>
-        </div>
-        {areas.length === 0 ? (
-          <p className="text-sm text-muted">No areas yet. Add one to give your island some life.</p>
-        ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {areas.map((a) => (
-              <li key={a.id}>
-                <button onClick={() => selectArea(a.id)} className="flex w-full items-center gap-3 rounded-2xl border border-line/60 p-2 pr-3 text-left transition hover:bg-surface-2">
-                  <BuildingPreview type={a.type} variant={a.variant} color={a.color} className="h-[44px] w-[56px] shrink-0" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{a.name}</span>
-                    <span className="block text-xs text-muted">{designFor(a.type, a.variant).name}</span>
-                  </span>
-                  <Pencil size={14} className="text-muted" aria-hidden />
-                  <span className="sr-only">Edit {a.name}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <AreaSheet vitality={{}} />
-      <AddAreaDialog />
     </Section>
   );
 }
@@ -207,29 +170,14 @@ function ActivitiesSection() {
   const sorted = [...activities].sort((a, b) => a.order - b.order);
   const [confirm, setConfirm] = useState<Activity | null>(null);
   return (
-    <Section
-      id="activities"
-      title="Activities"
-      description="What you plan, its color, where it happens on the island, and how your character does it. “Mix it up” rotates between ways (e.g. laps on the track or a run around the whole island)."
-    >
-      <div className="hidden items-center gap-3 px-5 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted md:flex" aria-hidden>
-        <span className="w-7" />
-        <span className="w-64">Name</span>
-        <span className="ml-auto w-44">Happens at</span>
-        <span className="w-48">How it’s done</span>
-        <span className="w-36">Animation</span>
-        <span className="w-8" />
-      </div>
+    <Section id="activities" title="Activities" description="What you plan and the color it shows up in, across the planner and calendar.">
       <ul className="divide-y divide-line/60">
         {sorted.map((a) => (
-          <ActivityRow key={a.id} activity={a} onDelete={() => setConfirm(a)} />
+          <ActivityRow key={a.id} activity={a} canDelete={sorted.length > 1} onDelete={() => setConfirm(a)} />
         ))}
       </ul>
       <div className="px-5 py-3">
-        <button
-          className="btn-ghost text-accent"
-          onClick={() => useApp.getState().addActivity({ name: "New activity", color: "#4fb3b0", animation: "generic", areaId: null, areaType: null })}
-        >
+        <button className="btn-ghost text-accent" onClick={() => useApp.getState().addActivity({ name: "New activity", color: "#4fb3b0" })}>
           <Plus size={16} /> Add custom activity
         </button>
       </div>
@@ -245,11 +193,9 @@ function ActivitiesSection() {
   );
 }
 
-function ActivityRow({ activity, onDelete }: { activity: Activity; onDelete(): void }) {
-  const areas = useApp((s) => s.areas);
+function ActivityRow({ activity, canDelete, onDelete }: { activity: Activity; canDelete: boolean; onDelete(): void }) {
   const [open, setOpen] = useState(false);
   const save = (patch: Partial<Activity>) => useApp.getState().saveActivity({ ...activity, ...patch });
-  const linkValue = activity.areaId ? `area:${activity.areaId}` : activity.areaType ? `type:${activity.areaType}` : "none";
   return (
     <li className="px-5 py-3">
       <div className="flex items-center gap-3">
@@ -264,17 +210,11 @@ function ActivityRow({ activity, onDelete }: { activity: Activity; onDelete(): v
           Activity name
         </label>
         <SavedInput id={`act-name-${activity.id}`} value={activity.name} onSave={(name) => save({ name })} />
-        <div className="ml-auto hidden items-center gap-2 md:flex">
-          <ActivitySelects activity={activity} areas={areas} linkValue={linkValue} save={save} idSuffix="d" />
-        </div>
-        {!activity.preset && (
-          <button className="btn-ghost h-8 w-8 shrink-0 p-0 text-muted" onClick={onDelete} aria-label={`Delete ${activity.name}`}>
+        {canDelete && (
+          <button className="btn-ghost ml-auto h-8 w-8 shrink-0 p-0 text-muted" onClick={onDelete} aria-label={`Delete ${activity.name}`}>
             <Trash2 size={15} />
           </button>
         )}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2 md:hidden">
-        <ActivitySelects activity={activity} areas={areas} linkValue={linkValue} save={save} idSuffix="m" />
       </div>
       {open && (
         <div className="mt-3">
@@ -282,79 +222,6 @@ function ActivityRow({ activity, onDelete }: { activity: Activity; onDelete(): v
         </div>
       )}
     </li>
-  );
-}
-
-function ActivitySelects({
-  activity,
-  areas,
-  linkValue,
-  save,
-  idSuffix,
-}: {
-  idSuffix: string;
-  activity: Activity;
-  areas: ReturnType<typeof useApp.getState>["areas"];
-  linkValue: string;
-  save(p: Partial<Activity>): void;
-}) {
-  return (
-    <>
-      <label className="sr-only" htmlFor={`act-area-${activity.id}-${idSuffix}`}>
-        Island area for {activity.name}
-      </label>
-      <select
-        id={`act-area-${activity.id}-${idSuffix}`}
-        className="input h-9 w-full py-1 md:w-44"
-        value={linkValue}
-        onChange={(e) => {
-          const [kind, val] = e.target.value.split(":");
-          if (kind === "area") save({ areaId: val });
-          else if (kind === "type") save({ areaId: null, areaType: val as Activity["areaType"] });
-          else save({ areaId: null, areaType: null });
-        }}
-      >
-        <option value="none">Plaza (no area)</option>
-        {activity.areaType && <option value={`type:${activity.areaType}`}>Any {AREA_LABELS[activity.areaType].toLowerCase()}</option>}
-        {areas.map((a) => (
-          <option key={a.id} value={`area:${a.id}`}>
-            {a.name}
-          </option>
-        ))}
-      </select>
-      <label className="sr-only" htmlFor={`act-style-${activity.id}-${idSuffix}`}>
-        How {activity.name} is done
-      </label>
-      <select
-        id={`act-style-${activity.id}-${idSuffix}`}
-        className="input h-9 w-full py-1 md:w-48"
-        value={activity.style}
-        onChange={(e) => save({ style: e.target.value })}
-        title="How your character does this activity"
-      >
-        <option value="auto">Mix it up (rotates)</option>
-        {routinesFor(activity.animation).map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.label}
-          </option>
-        ))}
-      </select>
-      <label className="sr-only" htmlFor={`act-anim-${activity.id}-${idSuffix}`}>
-        Animation for {activity.name}
-      </label>
-      <select
-        id={`act-anim-${activity.id}-${idSuffix}`}
-        className="input h-9 w-full py-1 md:w-36"
-        value={activity.animation}
-        onChange={(e) => save({ animation: e.target.value as AnimationKind, style: "auto" })}
-      >
-        {ANIMATIONS.map((k) => (
-          <option key={k} value={k}>
-            {k === "generic" ? "Generic" : ANIMATION_VERB[k]}
-          </option>
-        ))}
-      </select>
-    </>
   );
 }
 
@@ -450,7 +317,7 @@ function DataSection() {
         open={pending !== null}
         onClose={() => setPending(null)}
         title="Replace all data?"
-        description="Your current island, plans, to-dos and goals will be replaced by the imported file. Consider exporting first."
+        description="Your current plans, to-dos, goals and settings will be replaced by the imported file. Consider exporting first."
         confirmLabel="Import"
         onConfirm={async () => {
           await useApp.getState().importData(pending);
@@ -463,8 +330,6 @@ function DataSection() {
 
 const RESETS: { scope: ResetScope; label: string; hint: string; confirm: string }[] = [
   { scope: "planner", label: "Planner", hint: "Removes all time blocks and restores the default template.", confirm: "Reset planner" },
-  { scope: "island", label: "Island", hint: "Removes all areas. Your character stays.", confirm: "Reset island" },
-  { scope: "character", label: "Character", hint: "Restores the default name and look.", confirm: "Reset character" },
   { scope: "tasks", label: "To-dos & goals", hint: "Removes all to-dos, lists and goals.", confirm: "Reset to-dos & goals" },
   { scope: "onboarding", label: "Replay onboarding", hint: "Walk through the welcome flow again. Nothing is deleted.", confirm: "Replay" },
   { scope: "all", label: "Everything", hint: "Start completely fresh.", confirm: "Reset everything" },
@@ -491,7 +356,6 @@ function ResetSection() {
         onConfirm={async () => {
           if (!scope) return;
           await useApp.getState().reset(scope.scope);
-          useUi.getState().selectArea(null);
           if (scope.scope !== "onboarding") toast(`${scope.label} reset`);
         }}
       />

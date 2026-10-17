@@ -1,11 +1,9 @@
 import type {
   Activity,
   AppData,
-  Area,
   BaseRecord,
   Block,
   Goal,
-  IslandMeta,
   Profile,
   Settings,
   Template,
@@ -39,10 +37,8 @@ export interface Repository {
   load(): Promise<AppData>;
 
   profile: Singleton<Profile>;
-  island: Singleton<IslandMeta>;
   settings: Singleton<Settings>;
 
-  areas: Collection<Area>;
   activities: Collection<Activity>;
   blocks: Collection<Block>;
   todos: Collection<Todo>;

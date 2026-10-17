@@ -2,15 +2,17 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  CalendarClock,
   CalendarDays,
   CheckSquare,
+  Home,
+  Monitor,
   Moon,
   Plus,
   Search,
   Settings,
-  Sparkles,
   Sun,
-  Footprints,
+  SunMoon,
   Target,
   type LucideIcon,
 } from "lucide-react";
@@ -40,8 +42,6 @@ export function CommandPalette() {
   const input = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  const areas = useApp((s) => s.areas);
-  const name = useApp((s) => s.profile.characterName);
   const theme = useApp((s) => s.settings.theme);
 
   // Global Cmd/Ctrl+K and number-key navigation.
@@ -67,54 +67,26 @@ export function CommandPalette() {
   const commands = useMemo<Command[]>(() => {
     const go = (href: string) => () => router.push(href);
     const st = () => useApp.getState();
-    const list: Command[] = [
-      { id: "nav-island", label: "Go to island", group: "Navigate", icon: Sparkles, run: go("/") },
-      { id: "nav-planner", label: "Plan tomorrow", group: "Navigate", icon: CalendarDays, run: go("/planner") },
-      { id: "nav-today", label: "Plan today", group: "Navigate", icon: CalendarDays, run: go("/planner?day=today") },
+    const themes = [
+      { value: "auto", label: "Theme: follow the time of day", icon: SunMoon },
+      { value: "system", label: "Theme: match my device", icon: Monitor },
+      { value: "light", label: "Theme: always light", icon: Sun },
+      { value: "dark", label: "Theme: always dark", icon: Moon },
+    ] as const;
+    return [
+      { id: "nav-home", label: "Go to today", group: "Navigate", icon: Home, run: go("/") },
+      { id: "nav-calendar", label: "Open calendar", group: "Navigate", icon: CalendarDays, run: go("/calendar") },
+      { id: "nav-week", label: "Calendar: this week", group: "Navigate", icon: CalendarDays, run: go("/calendar?view=week") },
+      { id: "nav-planner", label: "Plan tomorrow", group: "Navigate", icon: CalendarClock, run: go("/planner") },
+      { id: "nav-today", label: "Plan today", group: "Navigate", icon: CalendarClock, run: go("/planner?day=today") },
       { id: "nav-todos", label: "Open to-dos", group: "Navigate", icon: CheckSquare, run: go("/todos") },
       { id: "nav-goals", label: "Open goals", group: "Navigate", icon: Target, run: go("/todos#goals") },
       { id: "nav-settings", label: "Open settings", group: "Navigate", icon: Settings, run: go("/settings") },
-      {
-        id: "add-area",
-        label: "Add an area to the island",
-        group: "Island",
-        icon: Plus,
-        run: () => {
-          router.push("/");
-          useUi.getState().setAddAreaOpen(true);
-        },
-      },
-      {
-        id: "theme",
-        label: theme === "dusk" ? "Switch to automatic day/night" : "Switch to dusk theme",
-        group: "Appearance",
-        icon: theme === "dusk" ? Sun : Moon,
-        run: () => st().updateSettings({ theme: theme === "dusk" ? "auto" : "dusk" }),
-      },
+      ...themes
+        .filter((t) => t.value !== theme)
+        .map((t) => ({ id: `theme-${t.value}`, label: t.label, group: "Appearance", icon: t.icon, run: () => st().updateSettings({ theme: t.value }) })),
     ];
-    for (const a of areas) {
-      list.push({
-        id: `send-${a.id}`,
-        label: `Send ${name || "character"} to ${a.name}`,
-        group: "Character",
-        icon: Footprints,
-        run: () => {
-          st().setOverride({ areaId: a.id, activityId: null });
-          toast(`${name} is heading to ${a.name}`);
-          router.push("/");
-        },
-      });
-    }
-    if (st().profile.override)
-      list.push({
-        id: "clear-send",
-        label: `Let ${name} follow the plan again`,
-        group: "Character",
-        icon: Footprints,
-        run: () => st().setOverride(null),
-      });
-    return list;
-  }, [areas, name, theme, router]);
+  }, [theme, router]);
 
   const results = useMemo(() => {
     const q = query.trim();
@@ -223,7 +195,7 @@ export function CommandPalette() {
                   <c.icon size={16} className="text-muted" aria-hidden />
                   <span className="flex-1 truncate">{c.label}</span>
                   {c.hint && <span className="text-xs text-muted">{c.hint}</span>}
-                  <span className="text-[11px] text-muted/80">{c.group}</span>
+                  <span className="text-[11px] text-muted">{c.group}</span>
                 </li>
               ))}
             </ul>

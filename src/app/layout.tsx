@@ -9,7 +9,7 @@ const pixel = Pixelify_Sans({ subsets: ["latin"], variable: "--font-pixel", disp
 
 export const metadata: Metadata = {
   title: "Driftsync",
-  description: "A cozy routine hub on a floating pixel island.",
+  description: "A calm personal routine hub: plan your days, keep your to-dos and goals, see it all on a calendar.",
   icons: { icon: "/icon.svg" },
 };
 
@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 };
 
 /** Pick light/dark before paint so there's no flash (mirrors lib/daycycle + settings.theme). */
-const themeScript = `(()=>{try{var d=JSON.parse(localStorage.getItem("driftsync:data")||"{}");var t=(d.settings&&d.settings.theme)||"auto";var h=new Date().getHours()+new Date().getMinutes()/60;var dark=t==="dusk"||(t==="auto"&&(h>=19.25||h<6.25));document.documentElement.dataset.theme=dark?"dark":"light"}catch(e){}})()`;
+const themeScript = `(()=>{try{var d=JSON.parse(localStorage.getItem("driftsync:data")||"{}");var t=(d.settings&&d.settings.theme)||"auto";var h=new Date().getHours()+new Date().getMinutes()/60;var dark=t==="dark"||t==="dusk"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches)||(t==="auto"&&(h>=19.25||h<6.25));document.documentElement.dataset.theme=dark?"dark":"light"}catch(e){}})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

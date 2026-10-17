@@ -1,41 +1,13 @@
 import { z } from "zod";
 
 /** Bump when the persisted shape changes; add a migration in migrations.ts. */
-export const CURRENT_VERSION = 2;
+export const CURRENT_VERSION = 3;
 
-export const AREA_TYPES = ["gym", "study", "library", "photo", "track", "workshop", "hobby"] as const;
-export type AreaType = (typeof AREA_TYPES)[number];
-
-export const ANIMATIONS = ["study", "workout", "jog", "photo", "read", "work", "hobby", "rest", "generic"] as const;
-export type AnimationKind = (typeof ANIMATIONS)[number];
-
-export const HAIR_STYLES = [
-  "short",
-  "buzz",
-  "long",
-  "bob",
-  "ponytail",
-  "bun",
-  "pigtails",
-  "curly",
-  "afro",
-  "spiky",
-  "mohawk",
-  "wavy",
-  "bald",
-] as const;
-export type HairStyle = (typeof HAIR_STYLES)[number];
-
-export const EYE_STYLES = ["dot", "round", "sparkle", "sleepy", "lashes"] as const;
-export const FACIAL_HAIR = ["none", "stubble", "mustache", "beard"] as const;
-export const TOPS = ["tee", "hoodie", "sweater", "shirt", "tank", "dress", "overalls"] as const;
-export const TOP_PATTERNS = ["solid", "stripes", "dots"] as const;
-export const BOTTOMS = ["pants", "shorts", "skirt"] as const;
-export const HEADWEAR = ["none", "cap", "beanie", "bucket", "headband", "headphones", "flower", "bow"] as const;
-export const EYEWEAR = ["none", "round", "square", "sunglasses"] as const;
-export const NECKWEAR = ["none", "scarf", "necklace"] as const;
-
-export const THEMES = ["auto", "day", "dusk", "retro"] as const;
+/**
+ * auto = follows your local time (light by day, dark in the evening),
+ * system = follows the OS preference, light/dark = fixed.
+ */
+export const THEMES = ["auto", "system", "light", "dark"] as const;
 export type ThemeSetting = (typeof THEMES)[number];
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -50,80 +22,19 @@ const base = {
   deletedAt: z.string().nullable().catch(null),
 };
 
-export const appearanceSchema = z.object({
-  skin: z.number().int().min(0).max(7).catch(1),
-  hairStyle: z.enum(HAIR_STYLES).catch("short"),
-  hairColor: hex.catch("#4a3426"),
-  eyeStyle: z.enum(EYE_STYLES).catch("round"),
-  eyeColor: hex.catch("#2b2233"),
-  blush: z.boolean().catch(true),
-  freckles: z.boolean().catch(false),
-  facialHair: z.enum(FACIAL_HAIR).catch("none"),
-  top: z.enum(TOPS).catch("tee"),
-  /** Top color (kept as `outfitColor` for compatibility with v1 data). */
-  outfitColor: hex.catch("#6e5ee6"),
-  topPattern: z.enum(TOP_PATTERNS).catch("solid"),
-  bottom: z.enum(BOTTOMS).catch("pants"),
-  bottomColor: hex.catch("#3d3a5c"),
-  shoesColor: hex.catch("#4b4458"),
-  headwear: z.enum(HEADWEAR).catch("none"),
-  headwearColor: hex.catch("#e7795f"),
-  eyewear: z.enum(EYEWEAR).catch("none"),
-  neckwear: z.enum(NECKWEAR).catch("none"),
-  neckwearColor: hex.catch("#e7795f"),
-  backpack: z.boolean().catch(false),
-  /** Gym clothes worn for sporty activities. */
-  sportColor: hex.catch("#4fb3b0"),
-  sportSwitch: z.boolean().catch(true),
-});export type Appearance = z.infer<typeof appearanceSchema>;
-
-export const overrideSchema = z.object({
-  areaId: z.string(),
-  activityId: z.string().nullable(),
-  since: z.string(),
-});
-export type ManualOverride = z.infer<typeof overrideSchema>;
-
 export const profileSchema = z.object({
-  characterName: z.string().max(40).catch("Pip"),
-  appearance: appearanceSchema.catch(appearanceSchema.parse({})),
+  /** What to call you in greetings; empty means no name. */
+  name: z.string().max(40).catch(""),
   onboarded: z.boolean().catch(false),
-  override: overrideSchema.nullable().catch(null),
   updatedAt: z.string().catch(""),
 });
 export type Profile = z.infer<typeof profileSchema>;
-
-export const islandSchema = z.object({
-  name: z.string().max(40).catch("Driftsync"),
-  seed: z.number().int().catch(1),
-  /** Minimum size tier; the effective tier also depends on area count. */
-  tier: z.number().int().min(0).catch(0),
-  updatedAt: z.string().catch(""),
-});
-export type IslandMeta = z.infer<typeof islandSchema>;
-
-export const areaSchema = z.object({
-  ...base,
-  type: z.enum(AREA_TYPES),
-  name: z.string().max(40),
-  color: hex.nullable().catch(null),
-  variant: z.number().int().min(0).max(2).catch(0),
-  /** Footprint position relative to island center, in tiles. */
-  x: z.number().int(),
-  y: z.number().int(),
-});
-export type Area = z.infer<typeof areaSchema>;
 
 export const activitySchema = z.object({
   ...base,
   key: z.string(),
   name: z.string().max(40),
   color: hex,
-  animation: z.enum(ANIMATIONS).catch("generic"),
-  areaType: z.enum(AREA_TYPES).nullable().catch(null),
-  areaId: nullableId,
-  /** "auto" rotates between routines; otherwise a routine id (see island/character/routines.ts). */
-  style: z.string().catch("auto"),
   preset: z.boolean().catch(false),
   order: z.number().catch(0),
 });
@@ -216,9 +127,7 @@ export type Settings = z.infer<typeof settingsSchema>;
 export interface AppData {
   version: number;
   profile: Profile;
-  island: IslandMeta;
   settings: Settings;
-  areas: Area[];
   activities: Activity[];
   blocks: Block[];
   todos: Todo[];
@@ -227,10 +136,9 @@ export interface AppData {
   templates: Template[];
 }
 
-export type CollectionKey = "areas" | "activities" | "blocks" | "todos" | "lists" | "goals" | "templates";
+export type CollectionKey = "activities" | "blocks" | "todos" | "lists" | "goals" | "templates";
 
 export const collectionSchemas = {
-  areas: areaSchema,
   activities: activitySchema,
   blocks: blockSchema,
   todos: todoSchema,

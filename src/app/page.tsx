@@ -1,5 +1,5 @@
-import { IslandView } from "@/components/island/island-view";
+import { TodayView } from "@/components/today/today-view";
 
-export default function IslandPage() {
-  return <IslandView />;
+export default function TodayPage() {
+  return <TodayView />;
 }

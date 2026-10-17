@@ -63,7 +63,7 @@ export function PlannerSide({
         </div>
         {open.length === 0 ? (
           <EmptyState icon={<Inbox size={20} />} title="All clear">
-            Add to-dos from the island or the To-dos page, then time-block them here.
+            Add to-dos from Today or the To-dos page, then time-block them here.
           </EmptyState>
         ) : (
           <ul className="-mx-1 max-h-[42vh] space-y-0.5 overflow-y-auto">

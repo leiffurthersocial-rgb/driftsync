@@ -48,11 +48,6 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-.pixelated {
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-
 :focus-visible {
   outline: 2px solid rgb(var(--accent));
   outline-offset: 2px;

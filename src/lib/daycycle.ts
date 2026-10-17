@@ -23,10 +23,12 @@ export function dayLight(minutes: number): DayLight {
   return { night, golden: smooth(golden) };
 }
 
-export type ThemeMode = "auto" | "day" | "dusk" | "retro";
+export type ThemeMode = "auto" | "system" | "light" | "dark";
 
-export function lightFor(theme: ThemeMode, minutes: number): DayLight {
-  if (theme === "day" || theme === "retro") return { night: 0, golden: 0 };
-  if (theme === "dusk") return { night: 0.85, golden: 0.15 };
-  return dayLight(minutes);
+/** Whether the UI should be dark. `auto` follows local time; `system` follows the OS. */
+export function isDark(theme: ThemeMode, minutes: number, systemDark = false): boolean {
+  if (theme === "light") return false;
+  if (theme === "dark") return true;
+  if (theme === "system") return systemDark;
+  return dayLight(minutes).night > 0.5;
 }

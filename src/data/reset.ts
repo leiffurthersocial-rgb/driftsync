@@ -1,7 +1,7 @@
 import { createDefaultData } from "./defaults";
 import type { AppData } from "./schema";
 
-export const RESET_SCOPES = ["planner", "island", "character", "tasks", "onboarding", "all"] as const;
+export const RESET_SCOPES = ["planner", "tasks", "onboarding", "all"] as const;
 export type ResetScope = (typeof RESET_SCOPES)[number];
 
 /** Pure: return a copy of `data` with the given scope restored to defaults. */
@@ -12,19 +12,6 @@ export function applyReset(data: AppData, scope: ResetScope): AppData {
       return fresh;
     case "planner":
       return { ...data, blocks: [], templates: fresh.templates.map((t) => remapTemplate(t, fresh, data)) };
-    case "island":
-      return {
-        ...data,
-        areas: [],
-        island: { ...fresh.island, name: data.island.name },
-        profile: { ...data.profile, override: null },
-        activities: data.activities.map((a) => ({ ...a, areaId: null })),
-      };
-    case "character":
-      return {
-        ...data,
-        profile: { ...data.profile, characterName: fresh.profile.characterName, appearance: fresh.profile.appearance },
-      };
     case "tasks":
       return {
         ...data,

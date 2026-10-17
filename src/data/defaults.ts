@@ -1,12 +1,8 @@
 import { stamp } from "@/lib/id";
 import {
-  appearanceSchema,
   CURRENT_VERSION,
   type Activity,
-  type AnimationKind,
   type AppData,
-  type AreaType,
-  type IslandMeta,
   type Profile,
   type Settings,
   type Template,
@@ -16,38 +12,26 @@ interface PresetDef {
   key: string;
   name: string;
   color: string;
-  animation: AnimationKind;
-  areaType: AreaType | null;
 }
 
 /** Built-in activities. Names and colors are editable in Settings; keys are stable. */
 export const PRESET_ACTIVITIES: PresetDef[] = [
-  { key: "studying", name: "Studying", color: "#7c8cf0", animation: "study", areaType: "study" },
-  { key: "workout", name: "Working out", color: "#e7795f", animation: "workout", areaType: "gym" },
-  { key: "jogging", name: "Jogging", color: "#eea54b", animation: "jog", areaType: "track" },
-  { key: "photography", name: "Photography", color: "#d77fb4", animation: "photo", areaType: "photo" },
-  { key: "reading", name: "Reading", color: "#5fae84", animation: "read", areaType: "library" },
-  { key: "work", name: "Work", color: "#4f9cc4", animation: "work", areaType: "workshop" },
-  { key: "hobby", name: "Hobby", color: "#a888de", animation: "hobby", areaType: "hobby" },
-  { key: "rest", name: "Rest", color: "#93a6bd", animation: "rest", areaType: null },
+  { key: "studying", name: "Studying", color: "#7c8cf0" },
+  { key: "workout", name: "Working out", color: "#e7795f" },
+  { key: "jogging", name: "Jogging", color: "#eea54b" },
+  { key: "photography", name: "Photography", color: "#d77fb4" },
+  { key: "reading", name: "Reading", color: "#5fae84" },
+  { key: "work", name: "Work", color: "#4f9cc4" },
+  { key: "hobby", name: "Hobby", color: "#a888de" },
+  { key: "rest", name: "Rest", color: "#93a6bd" },
 ];
 
 export function defaultActivities(): Activity[] {
-  return PRESET_ACTIVITIES.map((p, i) => ({ ...stamp(), ...p, areaId: null, style: "auto", preset: true, order: i }));
+  return PRESET_ACTIVITIES.map((p, i) => ({ ...stamp(), ...p, preset: true, order: i }));
 }
 
 export function defaultProfile(): Profile {
-  return {
-    characterName: "Pip",
-    appearance: appearanceSchema.parse({}),
-    onboarded: false,
-    override: null,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-export function defaultIsland(): IslandMeta {
-  return { name: "Driftsync", seed: Math.floor(Math.random() * 1_000_000), tier: 0, updatedAt: new Date().toISOString() };
+  return { name: "", onboarded: false, updatedAt: new Date().toISOString() };
 }
 
 export function defaultSettings(): Settings {
@@ -85,9 +69,7 @@ export function createDefaultData(): AppData {
   return {
     version: CURRENT_VERSION,
     profile: defaultProfile(),
-    island: defaultIsland(),
     settings: defaultSettings(),
-    areas: [],
     activities,
     blocks: [],
     todos: [],

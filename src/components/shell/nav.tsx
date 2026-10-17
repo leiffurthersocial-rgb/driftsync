@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, CheckSquare, Command, Settings, Sparkles } from "lucide-react";
+import { CalendarClock, CalendarDays, CheckSquare, Command, Home, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -9,28 +9,23 @@ import { useUi } from "@/store/ui-store";
 import { cn } from "@/lib/cn";
 
 export const NAV_ITEMS = [
-  { href: "/", label: "Island", icon: Sparkles, key: "1" },
-  { href: "/planner", label: "Planner", icon: CalendarDays, key: "2" },
-  { href: "/todos", label: "To-dos", icon: CheckSquare, key: "3" },
-  { href: "/settings", label: "Settings", icon: Settings, key: "4" },
+  { href: "/", label: "Today", icon: Home },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/planner", label: "Planner", icon: CalendarClock },
+  { href: "/todos", label: "To-dos", icon: CheckSquare },
+  { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function TopNav() {
   const pathname = usePathname();
   const openPalette = useUi((s) => s.setPaletteOpen);
-  const onIsland = pathname === "/";
   return (
-    <header
-      className={cn(
-        "fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between gap-4 px-4 sm:px-6",
-        !onIsland && "border-b border-line/60 bg-bg/80 backdrop-blur-md",
-      )}
-    >
+    <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-line/60 bg-bg/80 px-4 backdrop-blur-md sm:px-6">
       <Link href="/" className="rounded-lg" aria-label="Driftsync home">
         <Logo />
       </Link>
       <nav aria-label="Main" className="absolute left-1/2 hidden -translate-x-1/2 md:block">
-        <ul className={cn("flex gap-1 rounded-2xl p-1", onIsland ? "bg-surface/80 shadow-soft backdrop-blur-md" : "bg-surface-2/70")}>
+        <ul className="flex gap-1 rounded-2xl bg-surface-2/70 p-1">
           {NAV_ITEMS.map((item) => {
             const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
@@ -39,7 +34,7 @@ export function TopNav() {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative z-10 flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-sm font-medium transition",
+                    "relative z-10 flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition",
                     active ? "text-ink" : "text-muted hover:text-ink",
                   )}
                 >
@@ -60,10 +55,7 @@ export function TopNav() {
       </nav>
       <button
         onClick={() => openPalette(true)}
-        className={cn(
-          "btn h-9 gap-2 rounded-xl border border-line/70 px-3 text-muted hover:text-ink",
-          onIsland ? "bg-surface/80 shadow-soft backdrop-blur-md" : "bg-surface",
-        )}
+        className="btn h-9 gap-2 rounded-xl border border-line/70 bg-surface px-3 text-muted hover:text-ink"
         aria-label="Open command palette"
       >
         <Command size={15} aria-hidden />
@@ -81,7 +73,7 @@ export function BottomNav() {
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-line/60 bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {NAV_ITEMS.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return (

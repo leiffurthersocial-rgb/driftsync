@@ -2,17 +2,11 @@
 
 import { create } from "zustand";
 import { getRepository } from "@/data";
-import { appearanceSchema } from "@/data/schema";
 import type {
   Activity,
   AppData,
-  Appearance,
-  Area,
-  AreaType,
   Block,
   Goal,
-  IslandMeta,
-  ManualOverride,
   Profile,
   Settings,
   Template,
@@ -21,40 +15,21 @@ import type {
 } from "@/data/schema";
 import type { ResetScope } from "@/data/reset";
 import { stamp, nowIso } from "@/lib/id";
-import { fitTier, placeWithGrowth, MAX_AREAS } from "@/lib/island-layout";
-import { AREA_LABELS } from "@/lib/activities";
 import { addDays } from "@/lib/time";
 import { reorderSubset } from "@/lib/goals";
 
 type Patch<T> = Partial<Omit<T, "id" | "createdAt">>;
-
-export interface AddAreaResult {
-  ok: boolean;
-  area?: Area;
-  reason?: string;
-}
 
 export interface AppState extends AppData {
   ready: boolean;
 
   hydrate(): Promise<void>;
 
-  // profile & island
+  // profile & activities
   updateProfile(patch: Partial<Profile>): void;
-  updateAppearance(patch: Partial<Appearance>): void;
-  updateIsland(patch: Partial<IslandMeta>): void;
-  setOverride(override: Omit<ManualOverride, "since"> | null): void;
-  completeOnboarding(input: { characterName: string; islandName: string; appearance: Appearance; areaTypes: AreaType[] }): void;
-
-  // areas
-  addArea(type: AreaType, opts?: { name?: string; color?: string | null; variant?: number }): AddAreaResult;
-  updateArea(id: string, patch: Patch<Area>): void;
-  removeArea(id: string): void;
-  rerollArea(id: string): boolean;
-
-  // activities
+  completeOnboarding(input: { name: string; activityIds?: string[] }): void;
   saveActivity(activity: Activity): void;
-  addActivity(input: Pick<Activity, "name" | "color" | "animation" | "areaId" | "areaType"> & { style?: string }): Activity;
+  addActivity(input: Pick<Activity, "name" | "color">): Activity;
   removeActivity(id: string): void;
 
   // planner
@@ -92,7 +67,7 @@ const fire = (p: Promise<unknown>) => void p.catch((e) => console.warn("[driftsy
 
 export const useApp = create<AppState>()((set, get) => {
   /** Upsert a record into a collection in state + repository. */
-  function put<K extends "areas" | "activities" | "blocks" | "todos" | "lists" | "goals" | "templates">(
+  function put<K extends "activities" | "blocks" | "todos" | "lists" | "goals" | "templates">(
     key: K,
     record: AppData[K][number],
   ) {
@@ -106,12 +81,12 @@ export const useApp = create<AppState>()((set, get) => {
     return next;
   }
 
-  function drop(key: "areas" | "activities" | "blocks" | "todos" | "lists" | "goals" | "templates", id: string) {
+  function drop(key: "activities" | "blocks" | "todos" | "lists" | "goals" | "templates", id: string) {
     set((s) => ({ [key]: (s[key] as { id: string }[]).filter((r) => r.id !== id) }) as Partial<AppState>);
     fire(repo()[key].remove(id));
   }
 
-  function patchRecord<K extends "areas" | "activities" | "blocks" | "todos" | "lists" | "goals" | "templates">(
+  function patchRecord<K extends "activities" | "blocks" | "todos" | "lists" | "goals" | "templates">(
     key: K,
     id: string,
     patch: object,
@@ -120,7 +95,7 @@ export const useApp = create<AppState>()((set, get) => {
     if (cur) put(key, { ...cur, ...patch } as AppData[K][number]);
   }
 
-  function saveSingleton<K extends "profile" | "island" | "settings">(key: K, value: AppData[K]) {
+  function saveSingleton<K extends "profile" | "settings">(key: K, value: AppData[K]) {
     const next = touch(value);
     set({ [key]: next } as Partial<AppState>);
     fire((repo()[key] as { save(v: unknown): Promise<unknown> }).save(next));
@@ -138,76 +113,31 @@ export const useApp = create<AppState>()((set, get) => {
     },
 
     updateProfile: (patch) => saveSingleton("profile", { ...get().profile, ...patch }),
-    updateAppearance: (patch) =>
-      saveSingleton("profile", { ...get().profile, appearance: { ...get().profile.appearance, ...patch } }),
-    updateIsland: (patch) => saveSingleton("island", { ...get().island, ...patch }),
-    setOverride: (o) => saveSingleton("profile", { ...get().profile, override: o ? { ...o, since: nowIso() } : null }),
 
-    completeOnboarding({ characterName, islandName, appearance, areaTypes }) {
-      saveSingleton("island", { ...get().island, name: islandName.trim() || "Driftsync" });
-      // Replaying onboarding keeps existing areas; only missing types are added.
-      const existing = new Set(get().areas.map((a) => a.type));
-      for (const t of areaTypes) if (!existing.has(t)) get().addArea(t);
-      saveSingleton("profile", {
-        ...get().profile,
-        characterName: characterName.trim() || "Pip",
-        appearance,
-        onboarded: true,
-      });
-    },
-
-    addArea(type, opts = {}) {
-      const { areas, island } = get();
-      if (areas.length >= MAX_AREAS) return { ok: false, reason: "The island is full. Remove an area to make room." };
-      const pos = placeWithGrowth(island.tier, island.seed, areas);
-      if (!pos) return { ok: false, reason: "No room left for another area." };
-      if (pos.tier !== island.tier) saveSingleton("island", { ...island, tier: pos.tier });
-      const area = put("areas", {
-        ...stamp(),
-        type,
-        name: opts.name?.trim() || uniqueName(AREA_LABELS[type], areas),
-        color: opts.color ?? null,
-        variant: opts.variant ?? 0,
-        x: pos.x,
-        y: pos.y,
-      });
-      return { ok: true, area };
-    },
-
-    updateArea: (id, patch) => patchRecord("areas", id, patch),
-
-    removeArea(id) {
-      drop("areas", id);
-      const { areas, island, profile, activities } = get();
-      const tier = fitTier(island.seed, areas, island.tier);
-      if (tier !== island.tier) saveSingleton("island", { ...island, tier });
-      if (profile.override?.areaId === id) saveSingleton("profile", { ...profile, override: null });
-      for (const a of activities) if (a.areaId === id) put("activities", { ...a, areaId: null });
-    },
-
-    rerollArea(id) {
-      const { areas, island } = get();
-      const target = areas.find((a) => a.id === id);
-      if (!target) return false;
-      const others = areas.filter((a) => a.id !== id);
-      const pos = placeWithGrowth(island.tier, island.seed, others, {
-        jitter: Math.floor(Math.random() * 100000) + 1,
-        avoid: target,
-      });
-      if (!pos) return false;
-      if (pos.tier !== island.tier) saveSingleton("island", { ...island, tier: pos.tier });
-      put("areas", { ...target, x: pos.x, y: pos.y });
-      return true;
+    completeOnboarding({ name, activityIds }) {
+      // Unpicked activities are dropped so the planner only offers what you do, unless something
+      // already uses them (replaying onboarding must never strip existing plans).
+      if (activityIds?.length) {
+        const { blocks, goals } = get();
+        const used = new Set([...blocks.map((b) => b.activityId), ...goals.map((g) => g.frequency?.activityId)]);
+        for (const a of get().activities) if (!activityIds.includes(a.id) && !used.has(a.id)) get().removeActivity(a.id);
+      }
+      saveSingleton("profile", { ...get().profile, name: name.trim(), onboarded: true });
     },
 
     saveActivity: (activity) => void put("activities", activity),
     addActivity(input) {
       const order = Math.max(0, ...get().activities.map((a) => a.order)) + 1;
-      return put("activities", { ...stamp(), key: `custom-${Date.now()}`, preset: false, order, style: "auto", ...input });
+      return put("activities", { ...stamp(), key: `custom-${Date.now()}`, preset: false, order, ...input });
     },
     removeActivity(id) {
+      // Blocks and template entries keep the activity's color so plans don't turn grey.
+      const color = get().activities.find((a) => a.id === id)?.color ?? null;
       drop("activities", id);
-      for (const b of get().blocks) if (b.activityId === id) put("blocks", { ...b, activityId: null });
+      for (const b of get().blocks) if (b.activityId === id) put("blocks", { ...b, activityId: null, color: b.color ?? color });
+      for (const t of get().templates)
+        if (t.blocks.some((b) => b.activityId === id))
+          put("templates", { ...t, blocks: t.blocks.map((b) => (b.activityId === id ? { ...b, activityId: null, color: b.color ?? color } : b)) });
     },
 
     addBlock: (input) => put("blocks", { ...stamp(), ...input }),
@@ -315,26 +245,12 @@ export const useApp = create<AppState>()((set, get) => {
   };
 });
 
-function uniqueName(base: string, areas: Area[]) {
-  const names = new Set(areas.map((a) => a.name));
-  if (!names.has(base)) return base;
-  for (let i = 2; ; i++) if (!names.has(`${base} ${i}`)) return `${base} ${i}`;
-}
-
 function emptyData(): AppData {
   const t = "";
   return {
     version: 1,
-    profile: {
-      characterName: "",
-      appearance: appearanceSchema.parse({}),
-      onboarded: true,
-      override: null,
-      updatedAt: t,
-    },
-    island: { name: "", seed: 1, tier: 0, updatedAt: t },
+    profile: { name: "", onboarded: true, updatedAt: t },
     settings: { theme: "auto", dayStartHour: 6, dayEndHour: 24, clock: "24h", weekStart: 1, defaultBlockMinutes: 60, updatedAt: t },
-    areas: [],
     activities: [],
     blocks: [],
     todos: [],

@@ -92,7 +92,7 @@ export class LocalStorageRepository implements Repository {
     };
   }
 
-  private singleton<K extends "profile" | "island" | "settings">(key: K): Singleton<AppData[K]> {
+  private singleton<K extends "profile" | "settings">(key: K): Singleton<AppData[K]> {
     return {
       get: async () => this.get()[key],
       save: async (value) => {
@@ -105,9 +105,7 @@ export class LocalStorageRepository implements Repository {
   }
 
   profile = this.singleton("profile");
-  island = this.singleton("island");
   settings = this.singleton("settings");
-  areas = this.collection("areas");
   activities = this.collection("activities");
   blocks = this.collection("blocks");
   todos = this.collection("todos");
@@ -136,7 +134,7 @@ export class LocalStorageRepository implements Repository {
   }
 }
 
-const COLLECTIONS: CollectionKey[] = ["areas", "activities", "blocks", "todos", "lists", "goals", "templates"];
+const COLLECTIONS: CollectionKey[] = ["activities", "blocks", "todos", "lists", "goals", "templates"];
 
 function mapCollections(data: AppData, fn: <T extends BaseRecord>(arr: T[]) => T[]): AppData {
   const out = { ...data };
