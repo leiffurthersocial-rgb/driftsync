@@ -9,17 +9,39 @@ import { CommandPalette } from "./command-palette";
 import { Toaster } from "@/components/ui/toaster";
 import { Onboarding } from "@/components/onboarding/onboarding";
 import { Logo } from "./logo";
+import { CloudSync } from "@/components/account/cloud-sync";
+
+/** Sign-in pages render on their own (no nav, no onboarding gate). */
+const AUTH_ROUTES = ["/login", "/auth"];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const ready = useApp((s) => s.ready);
   const onboarded = useApp((s) => s.profile.onboarded);
   const pathname = usePathname();
 
+  // CloudSync stays mounted in the same spot whichever screen shows, so sync keeps running.
+  const sync = ready ? <CloudSync /> : null;
   if (!ready) return <LoadingScreen />;
-  if (!onboarded) return <Onboarding />;
+  if (AUTH_ROUTES.some((r) => pathname.startsWith(r)))
+    return (
+      <>
+        {sync}
+        {children}
+        <Toaster />
+      </>
+    );
+  if (!onboarded)
+    return (
+      <>
+        {sync}
+        <Onboarding />
+        <Toaster />
+      </>
+    );
 
   return (
     <>
+      {sync}
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2">
         Skip to content
       </a>

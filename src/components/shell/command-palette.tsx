@@ -7,6 +7,9 @@ import {
   CheckSquare,
   Home,
   BedDouble,
+  Cloud,
+  LogIn,
+  RefreshCw,
   LayoutTemplate,
   Monitor,
   Palette,
@@ -27,6 +30,8 @@ import { fuzzyScore } from "@/lib/fuzzy";
 import { parseQuickAdd } from "@/lib/quick-add";
 import { cn } from "@/lib/cn";
 import { THEME_DEFS } from "@/lib/themes";
+import { useCloud } from "@/store/cloud-store";
+import { syncNow } from "@/sync/runner";
 import type { DarkTheme, LightTheme } from "@/data/schema";
 
 interface Command {
@@ -48,6 +53,7 @@ export function CommandPalette() {
   const listRef = useRef<HTMLUListElement>(null);
 
   const theme = useApp((s) => s.settings.theme);
+  const cloud = { enabled: useCloud((s) => s.enabled), email: useCloud((s) => s.email) };
 
   // Global Cmd/Ctrl+K and number-key navigation.
   useEffect(() => {
@@ -97,10 +103,18 @@ export function CommandPalette() {
         icon: Palette,
         run: () => st().updateSettings(d.mode === "dark" ? { theme: "dark", darkTheme: d.id as DarkTheme } : { theme: "light", lightTheme: d.id as LightTheme }),
       })),
+      ...(cloud.enabled
+        ? cloud.email
+          ? [
+              { id: "sync-now", label: "Sync now", group: "Account", icon: RefreshCw, run: () => void syncNow() },
+              { id: "account", label: "Account & sync settings", group: "Account", icon: Cloud, run: go("/settings#account") },
+            ]
+          : [{ id: "sign-in", label: "Sign in to sync", group: "Account", icon: LogIn, run: go("/login") }]
+        : []),
       { id: "nav-templates", label: "Open templates", group: "Navigate", icon: LayoutTemplate, run: go("/templates") },
       { id: "nav-sleep", label: "Set wake-up and bedtime", group: "Planner", icon: BedDouble, run: go("/planner?day=today&sleep=1") },
     ];
-  }, [theme, router]);
+  }, [theme, router, cloud.enabled, cloud.email]);
 
   const results = useMemo(() => {
     const q = query.trim();

@@ -22,10 +22,12 @@ interface DialogProps {
   /** "center" modal, or "sheet": right panel on desktop / bottom sheet on mobile. */
   variant?: "center" | "sheet";
   className?: string;
+  /** Hide the close button for questions that must be answered (Esc still calls onClose). */
+  hideClose?: boolean;
 }
 
 /** Accessible modal: focus trap, Esc to close, focus restore, labelled by its title. */
-export function Dialog({ open, onClose, title, description, children, footer, variant = "center", className }: DialogProps) {
+export function Dialog({ open, onClose, title, description, children, footer, variant = "center", className, hideClose }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descId = useId();
@@ -120,9 +122,11 @@ export function Dialog({ open, onClose, title, description, children, footer, va
                   </p>
                 )}
               </div>
-              <button className="btn-ghost -mr-2 -mt-1 h-9 w-9 p-0" onClick={onClose} aria-label="Close">
-                <X size={18} />
-              </button>
+              {!hideClose && (
+                <button className="btn-ghost -mr-2 -mt-1 h-9 w-9 p-0" onClick={onClose} aria-label="Close">
+                  <X size={18} />
+                </button>
+              )}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-2">{children}</div>
             {footer && <div className="flex justify-end gap-2 border-t border-line/60 px-6 py-4">{footer}</div>}

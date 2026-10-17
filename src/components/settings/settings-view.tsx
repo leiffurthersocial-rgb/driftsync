@@ -14,11 +14,13 @@ import { ConfirmDialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
 import { DARK_DEFS, LIGHT_DEFS, THEME_DEFS } from "@/lib/themes";
 import { ThemePicker } from "./theme-picker";
+import { AccountSection } from "@/components/account/account-section";
 import { SleepDialog } from "@/components/planner/sleep-dialog";
 import { describeRepeat } from "@/lib/recurrence";
 import { formatDateShort, formatMinutes, minutesOfDay, toDateKey } from "@/lib/time";
 
 const SECTIONS = [
+  ["account", "Account"],
   ["profile", "Profile"],
   ["appearance", "Appearance"],
   ["activities", "Activities"],
@@ -65,6 +67,7 @@ export function SettingsView() {
           </ul>
         </nav>
         <div className="min-w-0 space-y-8">
+          <AccountSection Section={Section} Row={Row} />
           <ProfileSection />
           <AppearanceSection />
           <ActivitiesSection />

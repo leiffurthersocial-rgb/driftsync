@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { Logo } from "./logo";
+import { SyncIndicator } from "@/components/account/sync-indicator";
 import { useUi } from "@/store/ui-store";
 import { cn } from "@/lib/cn";
 
@@ -53,15 +54,18 @@ export function TopNav() {
           })}
         </ul>
       </nav>
-      <button
-        onClick={() => openPalette(true)}
-        className="btn h-9 gap-2 rounded-xl border border-line/70 bg-surface px-3 text-muted hover:text-ink"
-        aria-label="Open command palette"
-      >
-        <Command size={15} aria-hidden />
-        <span className="hidden text-sm sm:inline">Search</span>
-        <kbd className="kbd hidden sm:inline">⌘K</kbd>
-      </button>
+      <div className="flex items-center gap-2">
+        <SyncIndicator />
+        <button
+          onClick={() => openPalette(true)}
+          className="btn h-9 gap-2 rounded-xl border border-line/70 bg-surface px-3 text-muted hover:text-ink"
+          aria-label="Open command palette"
+        >
+          <Command size={15} aria-hidden />
+          <span className="hidden text-sm sm:inline">Search</span>
+          <kbd className="kbd hidden sm:inline">⌘K</kbd>
+        </button>
+      </div>
     </header>
   );
 }

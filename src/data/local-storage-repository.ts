@@ -1,7 +1,8 @@
 import { migrate } from "./migrations";
 import { applyReset, type ResetScope } from "./reset";
 import type { Collection, Repository, Singleton } from "./repository";
-import type { AppData, BaseRecord, CollectionKey } from "./schema";
+import { CURRENT_VERSION, collectionSchemas, profileSchema, settingsSchema, type AppData, type BaseRecord, type CollectionKey, type Profile, type Settings } from "./schema";
+import { defaultProfile, defaultSettings } from "./defaults";
 
 export const STORAGE_KEY = "driftsync:data";
 /** Soft-deleted records older than this are purged on load. */
@@ -27,6 +28,7 @@ export class LocalStorageRepository implements Repository {
   private data: AppData | null = null;
   private flushQueued = false;
   private store: KeyValueStore;
+  private listeners = new Set<() => void>();
 
   constructor(store?: KeyValueStore) {
     this.store = store ?? (typeof window !== "undefined" && window.localStorage ? window.localStorage : memoryStore());
@@ -42,12 +44,14 @@ export class LocalStorageRepository implements Repository {
         raw = undefined;
       }
       this.data = purge(migrate(raw));
-      this.persist();
+      this.persist(true);
     }
     return this.data;
   }
 
-  private persist() {
+  /** Save to storage. Local edits notify listeners (the sync engine); sync's own writes are silent. */
+  private persist(silent = false) {
+    if (!silent) for (const l of this.listeners) l();
     if (this.flushQueued) return;
     this.flushQueued = true;
     queueMicrotask(() => {
@@ -124,19 +128,169 @@ export class LocalStorageRepository implements Repository {
   }
 
   async importAll(raw: unknown) {
-    this.data = purge(migrate(raw));
+    // Imported data replaces everything, so it counts as edited now (and wins when syncing).
+    const t = new Date().toISOString();
+    const next = restamp(purge(migrate(raw)), t);
+    this.data = withTombstones(this.get(), next, t);
     this.persist();
     return visible(this.data);
   }
 
   async reset(scope: ResetScope) {
-    this.data = applyReset(this.get(), scope);
+    const t = new Date().toISOString();
+    this.data = withTombstones(this.get(), applyReset(this.get(), scope), t);
     this.persist();
     return visible(this.data);
   }
+
+  /* ---------- sync support (see src/sync/engine.ts) ---------- */
+
+  /** Called after every local edit. Returns an unsubscribe function. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  /** Everything edited after `since` (deletions included), for uploading. */
+  changedSince(since: string): SyncChanges {
+    const d = this.get();
+    const after = ms(since);
+    const records: SyncRecord[] = [];
+    for (const collection of COLLECTIONS)
+      for (const r of d[collection] as BaseRecord[]) if (ms(r.updatedAt) > after) records.push({ collection, record: r });
+    return {
+      records,
+      profile: ms(d.profile.updatedAt) > after ? d.profile : null,
+      settings: ms(d.settings.updatedAt) > after ? d.settings : null,
+    };
+  }
+
+  /**
+   * Merge changes from another device: for each record the newer `updatedAt` wins (ties keep
+   * the local copy). Invalid records are skipped. Returns how many local records changed.
+   */
+  applyRemote(changes: RemoteChanges, opts: { dedupePresets?: boolean } = {}): number {
+    const d = this.get();
+    let changed = 0;
+    const copies = new Map<CollectionKey, { arr: BaseRecord[]; index: Map<string, number> }>();
+    for (const { collection, record } of changes.records) {
+      const schema = collectionSchemas[collection];
+      if (!schema) continue;
+      const res = schema.safeParse(record);
+      if (!res.success) continue;
+      const next = res.data as BaseRecord;
+      let c = copies.get(collection);
+      if (!c) {
+        const arr = [...(d[collection] as BaseRecord[])];
+        c = { arr, index: new Map(arr.map((r, i) => [r.id, i])) };
+        copies.set(collection, c);
+      }
+      const i = c.index.get(next.id);
+      if (i === undefined) {
+        c.index.set(next.id, c.arr.length);
+        c.arr.push(next);
+      } else if (ms(next.updatedAt) > ms(c.arr[i].updatedAt)) c.arr[i] = next;
+      else continue;
+      changed++;
+    }
+    for (const [k, c] of copies) (d[k] as BaseRecord[]) = c.arr;
+    const prof = changes.profile ? profileSchema.safeParse({ ...defaultProfile(), ...(changes.profile as object) }) : null;
+    if (prof?.success && ms(prof.data.updatedAt) > ms(d.profile.updatedAt)) {
+      d.profile = prof.data;
+      changed++;
+    }
+    const sett = changes.settings ? settingsSchema.safeParse({ ...defaultSettings(), ...(changes.settings as object) }) : null;
+    if (sett?.success && ms(sett.data.updatedAt) > ms(d.settings.updatedAt)) {
+      d.settings = sett.data;
+      changed++;
+    }
+    if (opts.dedupePresets) changed += dedupePresetActivities(d);
+    if (changed) this.persist(true);
+    return changed;
+  }
+
+  /** Replace everything on this device with an account's data (first sign-in on a fresh device). */
+  replaceWithRemote(changes: RemoteChanges, version = CURRENT_VERSION) {
+    const raw: Record<string, unknown> = { version, profile: changes.profile ?? undefined, settings: changes.settings ?? undefined };
+    for (const c of COLLECTIONS) raw[c] = changes.records.filter((r) => r.collection === c).map((r) => r.record);
+    this.data = purge(migrate(raw));
+    this.persist(true);
+  }
+
+  /** True when nothing here was made by the user (only defaults), so an account's data can simply replace it. */
+  isPristine(): boolean {
+    const d = this.get();
+    const live = <T extends BaseRecord>(arr: T[]) => arr.some((r) => !r.deletedAt);
+    return !live(d.blocks) && !live(d.series) && !live(d.markers) && !live(d.todos) && !live(d.lists) && !live(d.goals);
+  }
 }
 
-const COLLECTIONS: CollectionKey[] = ["activities", "blocks", "series", "markers", "todos", "lists", "goals", "templates"];
+export interface SyncRecord {
+  collection: CollectionKey;
+  record: BaseRecord;
+}
+export interface SyncChanges {
+  records: SyncRecord[];
+  profile: Profile | null;
+  settings: Settings | null;
+}
+/** Incoming changes are untrusted shapes until validated. */
+export interface RemoteChanges {
+  records: { collection: CollectionKey; record: unknown }[];
+  profile: unknown;
+  settings: unknown;
+}
+
+const ms = (iso: string | null | undefined) => {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isFinite(t) ? t : 0;
+};
+
+/** Records that existed before but not after a reset/import become deletions, so other devices learn about them. */
+function withTombstones(before: AppData, after: AppData, t: string): AppData {
+  const out = { ...after };
+  for (const k of COLLECTIONS) {
+    const ids = new Set((after[k] as BaseRecord[]).map((r) => r.id));
+    const gone = (before[k] as BaseRecord[]).filter((r) => !ids.has(r.id) && !r.deletedAt).map((r) => ({ ...r, deletedAt: t, updatedAt: t }));
+    (out[k] as BaseRecord[]) = [...(after[k] as BaseRecord[]), ...gone];
+  }
+  return out;
+}
+
+function restamp(data: AppData, t: string): AppData {
+  return {
+    ...mapCollections(data, (arr) => arr.map((r) => ({ ...r, updatedAt: t }))),
+    profile: { ...data.profile, updatedAt: t },
+    settings: { ...data.settings, updatedAt: t },
+  };
+}
+
+/**
+ * Two devices that both started from the default activities have "Work", "School", … with
+ * different ids. When merging, keep the account's copy and point this device's plans at it.
+ */
+function dedupePresetActivities(d: AppData): number {
+  const t = new Date().toISOString();
+  let changed = 0;
+  // The older copy (usually the account's) is kept.
+  const older = (x: AppData["activities"][number], y: AppData["activities"][number]) => x.createdAt < y.createdAt || (x.createdAt === y.createdAt && x.id < y.id);
+  for (const a of d.activities.filter((x) => x.preset && !x.deletedAt)) {
+    const keep = d.activities.find((b) => b.key === a.key && b.id !== a.id && !b.deletedAt && older(b, a));
+    if (!keep) continue;
+    const swap = (id: string | null) => (id === a.id ? keep.id : id);
+    d.blocks = d.blocks.map((b) => (b.activityId === a.id ? { ...b, activityId: keep.id, updatedAt: t } : b));
+    d.series = d.series.map((s) => (s.activityId === a.id ? { ...s, activityId: keep.id, updatedAt: t } : s));
+    d.templates = d.templates.map((tp) =>
+      tp.blocks.some((b) => b.activityId === a.id) ? { ...tp, blocks: tp.blocks.map((b) => ({ ...b, activityId: swap(b.activityId) })), updatedAt: t } : tp,
+    );
+    d.goals = d.goals.map((g) => (g.frequency?.activityId === a.id ? { ...g, frequency: { ...g.frequency, activityId: keep.id }, updatedAt: t } : g));
+    d.activities = d.activities.map((x) => (x.id === a.id ? { ...x, deletedAt: t, updatedAt: t } : x));
+    changed++;
+  }
+  return changed;
+}
+
+export const COLLECTIONS: CollectionKey[] = ["activities", "blocks", "series", "markers", "todos", "lists", "goals", "templates"];
 
 function mapCollections(data: AppData, fn: <T extends BaseRecord>(arr: T[]) => T[]): AppData {
   const out = { ...data };

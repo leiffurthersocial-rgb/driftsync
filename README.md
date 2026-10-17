@@ -20,7 +20,7 @@ npm run dev        # http://localhost:3000
 | `npm test` | Vitest unit tests for the pure logic |
 | `npm run check` | typecheck + lint + tests |
 
-No environment variables are needed. Data lives in `localStorage` on your device. Deploys on Vercel from `main` work with zero config.
+No environment variables are needed: data lives in `localStorage` on your device, and deploys on Vercel from `main` work with zero config. Accounts and sync across devices are optional; see [Accounts & sync](#accounts--sync-supabase).
 
 ## Stack and key decisions
 
@@ -59,10 +59,12 @@ src/
     migrations.ts         Versioned migrations; never throws, drops only invalid records
     repository.ts         Repository interface (the only thing stores talk to)
     local-storage-repository.ts
-    supabase-repository.ts  Stub (see "Connecting Supabase")
     reset.ts              Granular resets (pure)
-  store/                  Zustand stores (app data + UI state)
-supabase/schema.sql       Tables + row-level security for syncing with Supabase
+  sync/                   Optional Supabase sync: config, client, adapter, engine (pure, tested), runner
+  components/account/     Sign-in page, auth callback, Settings → Account, header cloud, first-sync dialog
+  store/                  Zustand stores (app data, UI state, sync status)
+supabase/schema.sql       Tables, row-level security, the push function and Realtime (idempotent)
+docs/supabase.md          Step-by-step: accounts and sync
 ```
 
 ## Pages
@@ -108,32 +110,15 @@ Everything persists through the `Repository` interface (`src/data/repository.ts`
 
 Export and import JSON live in Settings → Data. Imports go through the same migration and validation.
 
-## Connecting Supabase (with login)
+## Accounts & sync (Supabase)
 
-Today everything lives in `localStorage`. Supabase gives you an account, sync across devices and a backup. The app was built for this: all storage goes through the `Repository` interface, every record has an id, `updatedAt` and a soft-delete `deletedAt`, and `NEXT_PUBLIC_DRIFTSYNC_STORAGE=supabase` already switches `getRepository()` (`src/data/index.ts`) to `createSupabaseRepository()`, which is still a stub. The plan:
+Optional and off until configured. With two environment variables set, Driftsync gets sign-in (email magic links, plus Google/GitHub/… if you enable them) and syncs everything between your devices. Data is still saved on the device first, so the app stays instant and works offline; a background sync merges changes item by item (newest edit wins, deletions included), with Realtime for near-instant updates.
 
-**1. Create the project and tables**
-1. Create a free project at supabase.com. In *Project Settings → API*, copy the **Project URL** and the **anon public key** into `.env.local` (and later into Vercel → Settings → Environment Variables) as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The anon key is meant to be public. Never put the `service_role` key in the app.
-2. Open the *SQL editor* and run [`supabase/schema.sql`](supabase/schema.sql). It creates two tables: `app_state` (your profile and settings, one row per user) and `records` (every activity, block, repeat, sleep line, to-do, list, goal and template as a JSON row). It also turns on **row-level security**, so each signed-in user can only read and write their own rows. Storing records as JSON means app updates don't need database migrations, because the app's own `migrate()` and zod schemas validate whatever comes back.
+**Setup: follow [docs/supabase.md](docs/supabase.md).** In short: run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor, add your site's `/auth/callback` to the allowed redirect URLs, then set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (see `.env.example`) locally and in Vercel, and redeploy.
 
-**2. Turn on login**
-1. *Authentication → Providers*: enable **Email** (magic links: no passwords to store), and optionally **Google**, **Apple** or **GitHub** (each needs an OAuth client id/secret from that provider).
-2. *Authentication → URL Configuration*: set the Site URL to your Vercel domain and add `http://localhost:3000/**` and `https://<your-domain>/**` as redirect URLs.
-3. In the app: `npm install @supabase/supabase-js @supabase/ssr`, then:
-   - `src/lib/supabase.ts`: `createBrowserClient(url, anonKey)` from `@supabase/ssr`.
-   - A `/login` page with an email field calling `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: origin + "/auth/callback" } })`, plus provider buttons calling `signInWithOAuth({ provider: "google" })`.
-   - An `app/auth/callback/route.ts` that calls `exchangeCodeForSession(code)` and redirects to `/`.
-   - A small account row in Settings → Profile showing the signed-in email and a "Sign out" button (`supabase.auth.signOut()`).
-   - Login stays optional: without an account the app keeps working locally.
-
-**3. Sync (offline-first)**
-Implement `Repository` in `src/data/supabase-repository.ts` as a wrapper around `LocalStorageRepository`, so the UI stays instant and works offline:
-- **Reads** always come from the local copy.
-- **Writes** go to local storage first, then onto a small outbox that upserts to Supabase (`records`: `user_id, collection, id, data, updated_at, deleted_at`; `app_state` for profile/settings). Deletes are soft (`deleted_at`), so other devices learn about them.
-- **Pull** on sign-in, on focus and every few minutes: `select * from records where updated_at > lastSync`, then merge by `updated_at` (last write wins) and run the result through `migrate()`. Optionally subscribe to Supabase Realtime on `records` for instant cross-device updates (see the commented line in the SQL).
-- **First sign-in** uploads what's already on the device, merged with anything already in the account, so nothing is lost.
-
-`npm run check` plus a two-browser test (sign in on both, edit on one, watch the other) is the acceptance test. Steps 2 and 3 are not built yet; step 1 can be done today.
+- Pages: `/login` (email link or provider) and `/auth/callback` (finishes sign-in, waits for the first sync). Settings → Account & sync shows the status and has Sync now, Sign out (optionally clearing the device) and Delete cloud copy. A small cloud in the header shows sync state while signed in.
+- First sign-in on a device: an empty account receives this device's data; a fresh device receives the account's; if both have data you choose once between merging and using the account's data.
+- Code: `src/sync/` (config, client, the Supabase adapter, the sync engine and the runner that decides when to sync) and `src/components/account/`. The engine is unit-tested against an in-memory server that follows the same rules as the SQL.
 
 ## Keyboard
 
@@ -153,4 +138,5 @@ Implement `Repository` in `src/data/supabase-repository.ts` as a wrapper around 
 - **Habit goals count done blocks only.** Frequency goals ("jog 3× a week") count planner blocks of that activity that you mark done.
 - **Overlaps are allowed** and shown side by side with a small warning marker instead of being blocked.
 - **Touch:** dragging on empty timeline space scrolls, and tapping creates a block. Long-press a block to move it; resize handles respond immediately. To-dos use HTML5 drag and drop with a mouse, and long-press then drag on touch or pen (a floating preview plus a drop-time indicator). The calendar button schedules a to-do into the next free slot.
-- **Out of scope for now:** Supabase sync and login (schema ready, guide above), calendar import/export (.ics), reminders.
+- **Sync is per item, newest edit wins.** Two devices editing the same block at the same time end up with whichever edit was made last (by each device's clock); edits to different items never conflict.
+- **Out of scope for now:** calendar import/export (.ics), reminders.

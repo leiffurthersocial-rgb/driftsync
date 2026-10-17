@@ -31,10 +31,10 @@ export interface Singleton<T> {
 
 /**
  * The only way UI and stores touch persisted data.
- * Implementations: LocalStorageRepository (default), SupabaseRepository (stub).
+ * Implemented by LocalStorageRepository; src/sync keeps it in sync with Supabase.
  */
 export interface Repository {
-  readonly kind: "local" | "supabase";
+  readonly kind: "local";
   /** Load everything at once (used for hydration). */
   load(): Promise<AppData>;
 

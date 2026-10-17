@@ -41,6 +41,8 @@ export interface AppState extends AppData {
   ready: boolean;
 
   hydrate(): Promise<void>;
+  /** Re-read everything from the repository (after a sync brought in changes). */
+  reload(): Promise<void>;
 
   // profile & activities
   updateProfile(patch: Partial<Profile>): void;
@@ -164,6 +166,10 @@ export const useApp = create<AppState>()((set, get) => {
 
     async hydrate() {
       if (get().ready) return;
+      applyData(await repo().load());
+    },
+
+    async reload() {
       applyData(await repo().load());
     },
 

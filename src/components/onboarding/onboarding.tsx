@@ -6,6 +6,8 @@ import { useState } from "react";
 import { useApp } from "@/store/app-store";
 import { toast } from "@/store/ui-store";
 import { Logo } from "@/components/shell/logo";
+import Link from "next/link";
+import { cloudEnabled } from "@/sync/config";
 import { Segmented } from "@/components/ui/controls";
 import { cn } from "@/lib/cn";
 
@@ -86,6 +88,14 @@ export function Onboarding() {
                       ]}
                     />
                   </div>
+                  {cloudEnabled && (
+                    <p className="text-sm text-muted">
+                      Used Driftsync on another device?{" "}
+                      <Link href="/login" className="font-medium text-accent hover:underline">
+                        Sign in to bring your data
+                      </Link>
+                    </p>
+                  )}
                   <button type="submit" className="hidden" />
                 </form>
               )}
