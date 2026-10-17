@@ -11,7 +11,7 @@ export function applyReset(data: AppData, scope: ResetScope): AppData {
     case "all":
       return fresh;
     case "planner":
-      return { ...data, blocks: [], templates: fresh.templates.map((t) => remapTemplate(t, fresh, data)) };
+      return { ...data, blocks: [], series: [], markers: [], templates: fresh.templates.map((t) => remapTemplate(t, fresh, data)) };
     case "tasks":
       return {
         ...data,
@@ -19,6 +19,7 @@ export function applyReset(data: AppData, scope: ResetScope): AppData {
         lists: [],
         goals: [],
         blocks: data.blocks.map((b) => ({ ...b, todoId: null, goalId: null })),
+        series: data.series.map((s) => ({ ...s, goalId: null })),
       };
     case "onboarding":
       return { ...data, profile: { ...data.profile, onboarded: false } };

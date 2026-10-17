@@ -1,13 +1,13 @@
 "use client";
 
-import { ArrowRight, CalendarClock, CalendarDays, CheckSquare, Coffee, Plus, Target } from "lucide-react";
+import { ArrowRight, CalendarClock, CalendarDays, CheckSquare, Coffee, Moon, Plus, Repeat, Sun, Target } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import type { Activity, Block } from "@/data/schema";
 import { useApp } from "@/store/app-store";
 import { toast } from "@/store/ui-store";
 import { useNow } from "@/hooks/use-now";
-import { useCurrentBlocks } from "@/hooks/use-day-blocks";
+import { useBlocks, useCurrentBlocks, useDayMarkers } from "@/hooks/use-day-blocks";
 import { blockColor } from "@/lib/activities";
 import { greeting, weekDays } from "@/lib/calendar";
 import { goalProgress } from "@/lib/goals";
@@ -23,6 +23,8 @@ export function TodayView() {
   const now = useNow(30_000);
   const name = useApp((s) => s.profile.name);
   const { today, minute, todays, active, next } = useCurrentBlocks(now);
+  const markers = useDayMarkers(today);
+  const clock = useApp((s) => s.settings.clock);
   const activities = useApp((s) => s.activities);
   const byId = useMemo(() => new Map(activities.map((a) => [a.id, a])), [activities]);
 
@@ -30,7 +32,16 @@ export function TodayView() {
     <PageContainer>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm text-muted">{formatDateLong(today)}</p>
+          <p className="flex flex-wrap items-center gap-x-3 text-sm text-muted">
+            <span>{formatDateLong(today)}</span>
+            {markers.map((m) => (
+              <span key={m.kind} className="inline-flex items-center gap-1">
+                {m.kind === "wake" ? <Sun size={13} aria-hidden /> : <Moon size={13} aria-hidden />}
+                <span className="sr-only">{m.kind === "wake" ? "Wake up at" : "Bedtime at"}</span>
+                {formatMinutes(m.time, clock)}
+              </span>
+            ))}
+          </p>
           <h1 className="font-pixel text-3xl tracking-wide sm:text-4xl">
             {greeting(now.getHours())}
             {name ? `, ${name}` : ""}
@@ -173,7 +184,10 @@ function AgendaCard({ blocks, minute, byId }: { blocks: Block[]; minute: number;
                   <span className="w-[92px] shrink-0 text-xs tabular-nums text-muted">{formatRange(b, clock)}</span>
                   <span className="h-8 w-1 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
                   <span className={cn("min-w-0 flex-1", past && !current && "opacity-60")}>
-                    <span className={cn("block truncate text-sm font-medium", b.done && "text-muted line-through")}>{title}</span>
+                    <span className={cn("flex items-center gap-1.5 text-sm font-medium", b.done && "text-muted line-through")}>
+                      <span className="truncate">{title}</span>
+                      {b.seriesId && <Repeat size={11} className="shrink-0 text-muted" aria-label="Repeats" />}
+                    </span>
                     {act && b.title && act.name !== b.title && <span className="block truncate text-xs text-muted">{act.name}</span>}
                   </span>
                   {current && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">Now</span>}
@@ -190,9 +204,9 @@ function AgendaCard({ blocks, minute, byId }: { blocks: Block[]; minute: number;
 
 function WeekCard({ today, byId, className }: { today: string; byId: Map<string, Activity>; className?: string }) {
   const weekStart = useApp((s) => s.settings.weekStart);
-  const blocks = useApp((s) => s.blocks);
   const todos = useApp((s) => s.todos);
   const days = weekDays(today, weekStart);
+  const blocks = useBlocks(days[0], days[6]);
   const perDay = days.map((d) => {
     const bs = blocks.filter((b) => b.date === d).sort((a, b) => a.start - b.start);
     return { date: d, blocks: bs, minutes: bs.reduce((s, b) => s + b.end - b.start, 0), due: todos.filter((t) => !t.done && t.due === d).length };

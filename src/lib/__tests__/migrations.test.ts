@@ -137,3 +137,32 @@ describe("v2 → v3", () => {
     expect(d.activities[0].name).toBe("Jogging");
   });
 });
+
+describe("v3 → v4", () => {
+  it("gives templates a kind and block ids, starts repeats and sleep lines empty, keeps the theme", () => {
+    const t = new Date().toISOString();
+    const d = migrate({
+      version: 3,
+      profile: { name: "Mo", onboarded: true },
+      settings: { theme: "dark" },
+      templates: [{ id: "t1", createdAt: t, updatedAt: t, name: "Weekday", blocks: [{ start: 540, end: 600, title: "Work", activityId: null }] }],
+      blocks: [{ id: "b1", createdAt: t, updatedAt: t, date: "2026-10-16", start: 60, end: 120, title: "x" }],
+    });
+    expect(d.version).toBe(4);
+    expect(d.templates[0]).toMatchObject({ kind: "day", name: "Weekday" });
+    expect(d.templates[0].blocks[0]).toMatchObject({ day: 0, title: "Work" });
+    expect(d.templates[0].blocks[0].id).toBeTruthy();
+    expect(d.series).toEqual([]);
+    expect(d.markers).toEqual([]);
+    expect(d.blocks[0]).toMatchObject({ seriesId: null, seriesDate: null });
+    expect(d.settings).toMatchObject({ theme: "dark", lightTheme: "paper", darkTheme: "dusk" });
+  });
+
+  it("drops a repeating block with an invalid rule but keeps the rest", () => {
+    const t = new Date().toISOString();
+    const ok = { id: "s1", createdAt: t, updatedAt: t, from: "2026-10-19", start: 600, end: 660, repeat: { freq: "weekly", weekdays: [1] } };
+    const d = migrate({ version: 4, series: [ok, { ...ok, id: "s2", repeat: { freq: "hourly" } }] });
+    expect(d.series.map((s) => s.id)).toEqual(["s1"]);
+    expect(d.series[0].repeat).toEqual({ freq: "weekly", interval: 1, weekdays: [1], until: null });
+  });
+});

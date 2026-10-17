@@ -3,10 +3,10 @@ import type { Repository } from "./repository";
 /**
  * Placeholder for a future Supabase-backed repository. See README "Connecting Supabase".
  *
- * Suggested mapping: one table per collection (activities, blocks, todos, lists, goals,
- * templates) with the same columns as the zod schemas plus `user_id`, and one `app_state` row per
- * user for the profile/settings singletons. Records already carry UUIDs, timestamps and
- * `deleted_at`, so last-write-wins sync on `updated_at` works out of the box.
+ * Tables (supabase/schema.sql): `app_state` (one row per user: profile, settings, version) and
+ * `records` (one row per collection record, the record stored as JSON). Records already carry
+ * ids, timestamps and `deletedAt`, so last-write-wins sync on `updated_at` works out of the box.
+ * The README section "Connecting Supabase (with login)" walks through auth and sync.
  */
 export function createSupabaseRepository(): Repository {
   throw new Error(

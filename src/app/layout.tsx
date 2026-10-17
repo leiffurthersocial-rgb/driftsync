@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Pixelify_Sans } from "next/font/google";
 import { Providers } from "@/components/shell/providers";
 import { AppShell } from "@/components/shell/app-shell";
+import { themeCss } from "@/lib/themes";
 import "./globals.css";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -23,13 +24,14 @@ export const viewport: Viewport = {
   ],
 };
 
-/** Pick light/dark before paint so there's no flash (mirrors lib/daycycle + settings.theme). */
-const themeScript = `(()=>{try{var d=JSON.parse(localStorage.getItem("driftsync:data")||"{}");var t=(d.settings&&d.settings.theme)||"auto";var h=new Date().getHours()+new Date().getMinutes()/60;var dark=t==="dark"||t==="dusk"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches)||(t==="auto"&&(h>=19.25||h<6.25));document.documentElement.dataset.theme=dark?"dark":"light"}catch(e){}})()`;
+/** Pick the palette before paint so there's no flash (mirrors lib/daycycle + components/shell/providers). */
+const themeScript = `(()=>{try{var d=JSON.parse(localStorage.getItem("driftsync:data")||"{}");var s=d.settings||{};var t=s.theme||"auto";if(t==="dusk")t="dark";if(t==="day"||t==="retro")t="light";var h=new Date().getHours()+new Date().getMinutes()/60;var dark=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches)||(t==="auto"&&(h>=19.25||h<6.25));var e=document.documentElement;e.dataset.mode=dark?"dark":"light";e.dataset.theme=dark?(s.darkTheme||"dusk"):(s.lightTheme||"paper")}catch(e){}})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning className={`${sans.variable} ${pixel.variable}`}>
+    <html lang="en" data-theme="paper" data-mode="light" suppressHydrationWarning className={`${sans.variable} ${pixel.variable}`}>
       <head>
+        <style dangerouslySetInnerHTML={{ __html: themeCss() }} />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-dvh font-sans">

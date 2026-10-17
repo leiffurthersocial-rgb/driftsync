@@ -1,8 +1,9 @@
 "use client";
 
 import { motion, Reorder, useDragControls } from "framer-motion";
-import { Check, Flag, GripVertical, Target } from "lucide-react";
+import { Check, Flag, GripVertical, Repeat, Target } from "lucide-react";
 import type { Goal, Todo, TodoList } from "@/data/schema";
+import { describeRepeat } from "@/lib/recurrence";
 import { formatDateShort, relativeDayLabel } from "@/lib/time";
 import { cn } from "@/lib/cn";
 
@@ -67,9 +68,14 @@ function ItemBody({ todo, today, list, goal, onToggle, onOpen, onMove, handle }:
       <Checkbox checked={todo.done} onChange={onToggle} label={`Mark “${todo.title}” ${todo.done ? "not done" : "done"}`} />
       <button onClick={onOpen} className="min-w-0 flex-1 text-left outline-none" aria-label={`${todo.title}. Open details. Alt+arrow keys to reorder.`}>
         <span className={cn("block truncate text-sm", todo.done && "text-muted line-through")}>{todo.title}</span>
-        {(todo.due || list || goal) && (
+        {(todo.due || todo.repeat || list || goal) && (
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
             {todo.due && <DueChip due={todo.due} today={today} />}
+            {todo.repeat && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted">
+                <Repeat size={11} aria-hidden /> {describeRepeat(todo.repeat, todo.due ?? today)}
+              </span>
+            )}
             {list && <span className="text-[11px] text-muted">#{list.name}</span>}
             {goal && (
               <span className="inline-flex items-center gap-1 text-[11px] text-muted">

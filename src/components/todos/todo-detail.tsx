@@ -6,12 +6,14 @@ import { useApp } from "@/store/app-store";
 import { toast } from "@/store/ui-store";
 import { Dialog } from "@/components/ui/dialog";
 import { Segmented } from "@/components/ui/controls";
+import { RepeatPicker } from "@/components/ui/repeat-picker";
 import { addDays, toDateKey } from "@/lib/time";
 
 export function TodoDetail({ todoId, onClose }: { todoId: string | null; onClose(): void }) {
   const todo = useApp((s) => s.todos.find((t) => t.id === todoId) ?? null);
   const lists = useApp((s) => s.lists);
   const goals = useApp((s) => s.goals);
+  const weekStart = useApp((s) => s.settings.weekStart);
   const { updateTodo, removeTodo } = useApp.getState();
   const [title, setTitle] = useState("");
   useEffect(() => {
@@ -83,12 +85,25 @@ export function TodoDetail({ todoId, onClose }: { todoId: string | null; onClose
                 {label}
               </button>
             ))}
-            {todo.due && (
+            {todo.due && !todo.repeat && (
               <button className="chip text-muted hover:text-ink" onClick={() => updateTodo(todo.id, { due: null })}>
                 Clear
               </button>
             )}
           </div>
+        </div>
+        <div>
+          <label htmlFor="todo-repeat" className="label">
+            Repeat
+          </label>
+          <RepeatPicker
+            id="todo-repeat"
+            value={todo.repeat}
+            anchor={todo.due ?? today}
+            weekStart={weekStart}
+            onChange={(repeat) => updateTodo(todo.id, { repeat, due: todo.due ?? (repeat ? today : null) })}
+          />
+          {todo.repeat && <p className="mt-1.5 text-xs text-muted">When you tick it off, the next one appears with its new due date.</p>}
         </div>
         <div>
           <span className="label">Priority</span>

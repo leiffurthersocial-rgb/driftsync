@@ -27,6 +27,8 @@ const todo = (id: string, done: boolean, goalId: string | null = "g1"): Todo => 
   order: 0,
   goalId,
   notes: "",
+  repeat: null,
+  repeatOf: null,
 });
 const block = (date: string, done: boolean, activityId = "jog"): Block => ({
   ...meta(`${date}-${done}-${activityId}`),
@@ -40,6 +42,8 @@ const block = (date: string, done: boolean, activityId = "jog"): Block => ({
   todoId: null,
   goalId: null,
   done,
+  seriesId: null,
+  seriesDate: null,
 });
 const ctx = { todos: [] as Todo[], blocks: [] as Block[], today: "2026-10-16", weekStart: 1 as const };
 

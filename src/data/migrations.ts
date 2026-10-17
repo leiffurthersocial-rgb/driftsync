@@ -77,6 +77,23 @@ export const migrations: Record<number, Migration> = {
     }
     return out;
   },
+  /** v3 → v4: templates gain a kind ("day") and per-block ids; repeating blocks and sleep/wake lines start empty. */
+  3: (data) => {
+    const out: Raw = { ...data, version: 4 };
+    if (Array.isArray(data.templates))
+      out.templates = data.templates.map((t) =>
+        isObject(t)
+          ? {
+              ...t,
+              kind: t.kind ?? "day",
+              blocks: Array.isArray(t.blocks) ? t.blocks.map((b) => (isObject(b) ? { id: uuid(), day: 0, ...b } : b)) : [],
+            }
+          : t,
+      );
+    out.series = Array.isArray(data.series) ? data.series : [];
+    out.markers = Array.isArray(data.markers) ? data.markers : [];
+    return out;
+  },
 };
 
 /** Validate a collection, dropping only the records that fail rather than the whole dataset. */
@@ -125,6 +142,8 @@ export function migrate(input: unknown): AppData {
     // An empty activity list would break the planner, so fall back to presets.
     activities: activities.length ? activities : defaults.activities,
     blocks: parseCollection(data.blocks, "blocks", []),
+    series: parseCollection(data.series, "series", []),
+    markers: parseCollection(data.markers, "markers", []),
     todos: parseCollection(data.todos, "todos", []),
     lists: parseCollection(data.lists, "lists", []),
     goals: parseCollection(data.goals, "goals", []),

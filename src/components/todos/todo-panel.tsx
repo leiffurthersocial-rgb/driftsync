@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/store/app-store";
 import { toast } from "@/store/ui-store";
 import { parseQuickAdd } from "@/lib/quick-add";
-import { toDateKey } from "@/lib/time";
+import { formatDateShort, relativeDayLabel, toDateKey } from "@/lib/time";
 import { EmptyState } from "@/components/ui/controls";
 import { Menu } from "@/components/ui/menu";
 import { ConfirmDialog, Dialog } from "@/components/ui/dialog";
@@ -78,7 +78,10 @@ export function TodoPanel() {
   const toggle = (id: string) => {
     const t = byId.get(id);
     useApp.getState().toggleTodo(id);
-    if (t && !t.done) toast("Nice — checked off", { tone: "success", action: { label: "Undo", run: () => useApp.getState().toggleTodo(id) } });
+    if (!t || t.done) return;
+    const next = t.repeat ? useApp.getState().todos.find((x) => x.repeatOf === id) : null;
+    const msg = next?.due ? `Checked off. Next one: ${relativeDayLabel(next.due, today) ?? formatDateShort(next.due)}` : "Checked off";
+    toast(msg, { tone: "success", action: { label: "Undo", run: () => useApp.getState().toggleTodo(id) } });
   };
   const listOf = (id: string | null) => lists.find((l) => l.id === id);
   const goalOf = (id: string | null) => goals.find((g) => g.id === id);

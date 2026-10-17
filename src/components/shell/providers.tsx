@@ -14,11 +14,13 @@ const subscribe = (cb: () => void) => {
   return () => mq.removeEventListener("change", cb);
 };
 
-/** Hydrates the store and keeps the light/dark theme in step with the setting, the clock and the OS. */
+/** Hydrates the store and keeps the palette in step with the theme setting, the clock and the OS. */
 export function Providers({ children }: { children: ReactNode }) {
   const hydrate = useApp((s) => s.hydrate);
   const ready = useApp((s) => s.ready);
   const theme = useApp((s) => s.settings.theme);
+  const lightTheme = useApp((s) => s.settings.lightTheme);
+  const darkTheme = useApp((s) => s.settings.darkTheme);
   const now = useNow(60_000);
   const systemDark = useSyncExternalStore(subscribe, () => window.matchMedia(DARK_QUERY).matches, () => false);
 
@@ -28,8 +30,11 @@ export function Providers({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    document.documentElement.dataset.theme = isDark(theme, minutesOfDay(now), systemDark) ? "dark" : "light";
-  }, [ready, theme, now, systemDark]);
+    const dark = isDark(theme, minutesOfDay(now), systemDark);
+    const el = document.documentElement;
+    el.dataset.mode = dark ? "dark" : "light";
+    el.dataset.theme = dark ? darkTheme : lightTheme;
+  }, [ready, theme, lightTheme, darkTheme, now, systemDark]);
 
   return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
 }

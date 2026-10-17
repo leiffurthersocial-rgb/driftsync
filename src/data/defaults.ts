@@ -1,4 +1,4 @@
-import { stamp } from "@/lib/id";
+import { stamp, uuid } from "@/lib/id";
 import {
   CURRENT_VERSION,
   type Activity,
@@ -16,12 +16,12 @@ interface PresetDef {
 
 /** Built-in activities. Names and colors are editable in Settings; keys are stable. */
 export const PRESET_ACTIVITIES: PresetDef[] = [
+  { key: "work", name: "Work", color: "#4f9cc4" },
+  { key: "school", name: "School", color: "#d77fb4" },
   { key: "studying", name: "Studying", color: "#7c8cf0" },
   { key: "workout", name: "Working out", color: "#e7795f" },
   { key: "jogging", name: "Jogging", color: "#eea54b" },
-  { key: "photography", name: "Photography", color: "#d77fb4" },
   { key: "reading", name: "Reading", color: "#5fae84" },
-  { key: "work", name: "Work", color: "#4f9cc4" },
   { key: "hobby", name: "Hobby", color: "#a888de" },
   { key: "rest", name: "Rest", color: "#93a6bd" },
 ];
@@ -37,6 +37,8 @@ export function defaultProfile(): Profile {
 export function defaultSettings(): Settings {
   return {
     theme: "auto",
+    lightTheme: "paper",
+    darkTheme: "dusk",
     dayStartHour: 6,
     dayEndHour: 24,
     clock: "24h",
@@ -49,16 +51,43 @@ export function defaultSettings(): Settings {
 export function defaultTemplates(activities: Activity[]): Template[] {
   const id = (key: string) => activities.find((a) => a.key === key)?.id ?? null;
   const h = (hh: number, mm = 0) => hh * 60 + mm;
+  const b = (day: number, start: number, end: number, title: string, key: string) => ({
+    id: uuid(),
+    day,
+    start,
+    end,
+    title,
+    activityId: id(key),
+    color: null,
+    notes: "",
+  });
+  const weekdays = [1, 2, 3, 4, 5];
   return [
     {
       ...stamp(),
       name: "My usual weekday",
+      kind: "day",
       blocks: [
-        { start: h(7, 30), end: h(8, 15), title: "Morning jog", activityId: id("jogging"), color: null, notes: "" },
-        { start: h(9), end: h(12), title: "Deep work", activityId: id("work"), color: null, notes: "" },
-        { start: h(13), end: h(16), title: "Work", activityId: id("work"), color: null, notes: "" },
-        { start: h(17, 30), end: h(18, 30), title: "Gym", activityId: id("workout"), color: null, notes: "" },
-        { start: h(21), end: h(22), title: "Reading", activityId: id("reading"), color: null, notes: "" },
+        b(0, h(7, 30), h(8, 15), "Morning jog", "jogging"),
+        b(0, h(9), h(12), "Deep work", "work"),
+        b(0, h(13), h(16), "Work", "work"),
+        b(0, h(17, 30), h(18, 30), "Gym", "workout"),
+        b(0, h(21), h(22), "Reading", "reading"),
+      ],
+    },
+    {
+      ...stamp(),
+      name: "My usual week",
+      kind: "week",
+      blocks: [
+        ...weekdays.map((d) => b(d, h(9), h(12), "Work", "work")),
+        ...weekdays.map((d) => b(d, h(13), h(17), "Work", "work")),
+        ...[1, 3, 5].map((d) => b(d, h(17, 30), h(18, 30), "Gym", "workout")),
+        ...[2, 4].map((d) => b(d, h(18), h(19, 30), "Evening class", "school")),
+        ...weekdays.map((d) => b(d, h(21), h(21, 45), "Reading", "reading")),
+        b(6, h(9), h(10), "Long run", "jogging"),
+        b(6, h(14), h(16), "Hobby time", "hobby"),
+        b(0, h(10), h(12), "Slow morning", "rest"),
       ],
     },
   ];
@@ -72,6 +101,8 @@ export function createDefaultData(): AppData {
     settings: defaultSettings(),
     activities,
     blocks: [],
+    series: [],
+    markers: [],
     todos: [],
     lists: [],
     goals: [],

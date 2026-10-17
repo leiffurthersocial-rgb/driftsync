@@ -1,22 +1,29 @@
 "use client";
 
-import { Download, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
+import { Download, LayoutTemplate, Moon, Plus, RotateCcw, Sun, Trash2, Upload } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Activity, ThemeSetting } from "@/data/schema";
 import type { ResetScope } from "@/data/reset";
 import { useApp } from "@/store/app-store";
 import { toast } from "@/store/ui-store";
-import { toDateKey } from "@/lib/time";
+import { isDark } from "@/lib/daycycle";
 import { PageContainer, PageHeader } from "@/components/shell/page-header";
 import { ColorSwatches, Segmented } from "@/components/ui/controls";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
+import { DARK_DEFS, LIGHT_DEFS, THEME_DEFS } from "@/lib/themes";
+import { ThemePicker } from "./theme-picker";
+import { SleepDialog } from "@/components/planner/sleep-dialog";
+import { describeRepeat } from "@/lib/recurrence";
+import { formatDateShort, formatMinutes, minutesOfDay, toDateKey } from "@/lib/time";
 
 const SECTIONS = [
   ["profile", "Profile"],
   ["appearance", "Appearance"],
   ["activities", "Activities"],
   ["planner", "Planner"],
+  ["sleep", "Sleep"],
   ["data", "Data"],
   ["reset", "Reset"],
 ] as const;
@@ -62,6 +69,7 @@ export function SettingsView() {
           <AppearanceSection />
           <ActivitiesSection />
           <PlannerSection />
+          <SleepSection />
           <DataSection />
           <ResetSection />
         </div>
@@ -145,14 +153,17 @@ const THEME_COPY: Record<ThemeSetting, string> = {
 };
 
 function AppearanceSection() {
-  const theme = useApp((s) => s.settings.theme);
+  const { theme, lightTheme, darkTheme } = useApp((s) => s.settings);
+  const update = useApp.getState().updateSettings;
+  const showingDark = isDark(theme, minutesOfDay(new Date()), typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const showing = THEME_DEFS.find((d) => d.id === (showingDark ? darkTheme : lightTheme));
   return (
-    <Section id="appearance" title="Appearance">
-      <Row label="Theme" hint={THEME_COPY[theme]}>
+    <Section id="appearance" title="Appearance" description="Pick when to go dark, and which light and dark palettes to use.">
+      <Row label="Mode" hint={`${THEME_COPY[theme]} Showing ${showing?.name ?? ""} now.`}>
         <Segmented
-          label="Theme"
+          label="Mode"
           value={theme}
-          onChange={(t) => useApp.getState().updateSettings({ theme: t })}
+          onChange={(t) => update({ theme: t })}
           options={[
             { value: "auto", label: "Time of day" },
             { value: "system", label: "Device" },
@@ -161,6 +172,24 @@ function AppearanceSection() {
           ]}
         />
       </Row>
+      <div className="px-5 py-4">
+        <p className="mb-3 text-sm font-medium">Light theme</p>
+        <ThemePicker
+          label="Light theme"
+          defs={LIGHT_DEFS}
+          value={lightTheme}
+          onChange={(id) => update({ lightTheme: id, ...(theme === "dark" ? { theme: "light" as const } : {}) })}
+        />
+      </div>
+      <div className="px-5 py-4">
+        <p className="mb-3 text-sm font-medium">Dark theme</p>
+        <ThemePicker
+          label="Dark theme"
+          defs={DARK_DEFS}
+          value={darkTheme}
+          onChange={(id) => update({ darkTheme: id, ...(theme === "light" ? { theme: "dark" as const } : {}) })}
+        />
+      </div>
     </Section>
   );
 }
@@ -255,6 +284,11 @@ function PlannerSection() {
       <Row label="Week starts on">
         <Segmented label="Week start" value={s.weekStart} onChange={(weekStart) => update({ weekStart })} options={[{ value: 1, label: "Monday" }, { value: 0, label: "Sunday" }]} />
       </Row>
+      <Row label="Templates" hint="Reusable days and weeks you can edit, copy and apply.">
+        <Link href="/templates" className="btn-soft">
+          <LayoutTemplate size={16} aria-hidden /> Manage templates
+        </Link>
+      </Row>
       <Row label="Default block length" htmlFor="set-len">
         <select id="set-len" className="input w-32" value={s.defaultBlockMinutes} onChange={(e) => update({ defaultBlockMinutes: Number(e.target.value) })}>
           {[15, 30, 45, 60, 90, 120, 180].map((m) => (
@@ -264,6 +298,57 @@ function PlannerSection() {
           ))}
         </select>
       </Row>
+    </Section>
+  );
+}
+
+function SleepSection() {
+  const markers = useApp((s) => s.markers);
+  const clock = useApp((s) => s.settings.clock);
+  const [open, setOpen] = useState(false);
+  const today = toDateKey(new Date());
+  // Repeating lines first, then one-day lines from today on.
+  const list = [...markers]
+    .filter((m) => m.repeat || m.date >= today)
+    .sort((a, b) => Number(!a.repeat) - Number(!b.repeat) || a.kind.localeCompare(b.kind) || a.date.localeCompare(b.date));
+  return (
+    <Section id="sleep" title="Sleep" description="Wake-up and bedtime lines in the planner and calendar. One-day lines override repeating ones; newer repeating lines win where they overlap.">
+      {list.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-muted">No sleep times yet.</p>
+      ) : (
+        <ul className="divide-y divide-line/60">
+          {list.map((m) => (
+            <li key={m.id} className="flex items-center gap-3 px-5 py-3">
+              {m.kind === "wake" ? <Sun size={16} className="shrink-0 text-[#e0962e]" aria-hidden /> : <Moon size={16} className="shrink-0 text-[#7c8cf0]" aria-hidden />}
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">
+                  {m.kind === "wake" ? "Wake up" : "Bedtime"} {formatMinutes(m.time, clock)}
+                </span>
+                <span className="block text-xs text-muted">
+                  {m.repeat ? `${describeRepeat(m.repeat, m.date)}, from ${formatDateShort(m.date)}` : `Only ${formatDateShort(m.date)}`}
+                  {m.skip.length > 0 && ` · ${m.skip.length} day${m.skip.length === 1 ? "" : "s"} skipped`}
+                </span>
+              </span>
+              <button
+                className="btn-ghost h-8 w-8 shrink-0 p-0 text-muted"
+                aria-label={`Delete ${m.kind === "wake" ? "wake-up" : "bedtime"} line at ${formatMinutes(m.time, clock)}`}
+                onClick={() => {
+                  useApp.getState().removeMarker(m.id);
+                  toast("Line removed");
+                }}
+              >
+                <Trash2 size={15} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="px-5 py-3">
+        <button className="btn-ghost text-accent" onClick={() => setOpen(true)}>
+          <Plus size={16} /> Set sleep times
+        </button>
+      </div>
+      <SleepDialog open={open} date={today} onClose={() => setOpen(false)} />
     </Section>
   );
 }
@@ -329,7 +414,7 @@ function DataSection() {
 }
 
 const RESETS: { scope: ResetScope; label: string; hint: string; confirm: string }[] = [
-  { scope: "planner", label: "Planner", hint: "Removes all time blocks and restores the default template.", confirm: "Reset planner" },
+  { scope: "planner", label: "Planner", hint: "Removes all time blocks, repeats and sleep lines, and restores the default templates.", confirm: "Reset planner" },
   { scope: "tasks", label: "To-dos & goals", hint: "Removes all to-dos, lists and goals.", confirm: "Reset to-dos & goals" },
   { scope: "onboarding", label: "Replay onboarding", hint: "Walk through the welcome flow again. Nothing is deleted.", confirm: "Replay" },
   { scope: "all", label: "Everything", hint: "Start completely fresh.", confirm: "Reset everything" },

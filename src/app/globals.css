@@ -2,39 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens. RGB triplets so Tailwind opacity modifiers work. */
-:root,
-[data-theme="light"] {
-  --bg: 246 241 233;
-  --surface: 255 252 247;
-  --surface-2: 240 234 224;
-  --line: 226 218 205;
-  --ink: 43 37 64;
-  --muted: 98 90 118;
-  --accent: 110 94 230;
-  --accent-ink: 255 255 255;
-  --sage: 110 168 120;
-  --peach: 176 92 56;
-  --danger: 182 60 60;
-  --shadow: 60 40 90;
-  color-scheme: light;
-}
-
-[data-theme="dark"] {
-  --bg: 22 19 38;
-  --surface: 33 29 55;
-  --surface-2: 44 39 72;
-  --line: 60 54 94;
-  --ink: 238 234 255;
-  --muted: 166 158 200;
-  --accent: 170 155 255;
-  --accent-ink: 24 18 48;
-  --sage: 140 200 150;
-  --peach: 245 170 135;
-  --danger: 240 120 120;
-  --shadow: 0 0 0;
-  color-scheme: dark;
-}
+/* Design tokens (per theme) are generated from src/lib/themes.ts and injected in app/layout.tsx. */
 
 html,
 body {

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Check, ChevronLeft, ChevronRight, Plus, Target } from "lucide-react";
+import { CalendarClock, CalendarRange, Check, ChevronLeft, ChevronRight, LayoutTemplate, Plus, Repeat, Save, Target } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
@@ -8,6 +8,10 @@ import type { Activity, Block, Goal, Todo } from "@/data/schema";
 import { useApp } from "@/store/app-store";
 import { toast } from "@/store/ui-store";
 import { useNow } from "@/hooks/use-now";
+import { useBlocks } from "@/hooks/use-day-blocks";
+import { markersFor } from "@/lib/series";
+import { Menu, type MenuItem } from "@/components/ui/menu";
+import { MARKER_STYLE } from "@/components/planner/timeline";
 import { blockColor } from "@/lib/activities";
 import { addMonths, formatMonth, formatWeekRange, monthGrid, sameMonth, weekDays, weekdayLabels } from "@/lib/calendar";
 import { parseQuickAdd } from "@/lib/quick-add";
@@ -27,8 +31,8 @@ interface DayIndex {
   goals: Map<string, Goal[]>;
 }
 
-function useDayIndex(): DayIndex {
-  const blocks = useApp((s) => s.blocks);
+function useDayIndex(from: string, to: string): DayIndex {
+  const blocks = useBlocks(from, to);
   const todos = useApp((s) => s.todos);
   const goals = useApp((s) => s.goals);
   return useMemo(() => {
@@ -61,8 +65,6 @@ export function CalendarView() {
   const weekStart = useApp((s) => s.settings.weekStart);
   const activities = useApp((s) => s.activities);
   const byId = useMemo(() => new Map(activities.map((a) => [a.id, a])), [activities]);
-  const index = useDayIndex();
-
   const [view, setView] = useState<View>(() => (params.get("view") === "week" ? "week" : "month"));
   const [date, setDate] = useState(() => {
     const d = params.get("date");
@@ -80,6 +82,29 @@ export function CalendarView() {
 
   const step = (dir: -1 | 1) => setDate((d) => (view === "month" ? addMonths(d, dir) : addDays(d, dir * 7)));
   const days = view === "week" ? weekDays(date, weekStart) : null;
+  const span = view === "week" ? days! : monthGrid(date, weekStart);
+  const index = useDayIndex(span[0], span[span.length - 1]);
+  const templates = useApp((s) => s.templates);
+  const weekTemplates = templates.filter((t) => t.kind === "week");
+  const weekActions: MenuItem[] = [
+    ...weekTemplates.map((t) => ({
+      label: `Apply “${t.name}”`,
+      icon: <CalendarRange size={15} />,
+      onSelect: () => {
+        const n = useApp.getState().applyTemplate(t.id, date);
+        toast(`Added ${n} blocks to this week`, { tone: "success" });
+      },
+    })),
+    {
+      label: "Save this week as template",
+      icon: <Save size={15} />,
+      onSelect: () => {
+        const t = useApp.getState().saveWeekTemplate(`Week of ${formatWeekRange(weekDays(date, weekStart))}`, date);
+        router.push(`/templates?id=${t.id}`);
+        toast("Saved. Rename or adjust it here.", { tone: "success" });
+      },
+    },
+  ];
 
   return (
     <PageContainer>
@@ -88,6 +113,17 @@ export function CalendarView() {
         subtitle={<span aria-live="polite">{view === "month" ? formatMonth(date) : formatWeekRange(days!)}</span>}
         actions={
           <>
+            {view === "week" && (
+              <Menu
+                label="Week actions"
+                trigger={
+                  <button className="btn-soft h-10 w-10 p-0" aria-label="Week templates">
+                    <LayoutTemplate size={17} />
+                  </button>
+                }
+                items={weekActions}
+              />
+            )}
             <Segmented
               label="Calendar view"
               value={view}
@@ -355,6 +391,7 @@ function DayPanel({ date, today, index, byId }: { date: string; today: string; i
 
 function WeekGrid({ days, today, minute, index, byId }: { days: string[]; today: string; minute: number; index: DayIndex; byId: Map<string, Activity> }) {
   const settings = useApp((s) => s.settings);
+  const markers = useApp((s) => s.markers);
   const startMin = settings.dayStartHour * 60;
   const endMin = settings.dayEndHour * 60;
   const hours = Array.from({ length: settings.dayEndHour - settings.dayStartHour }, (_, i) => settings.dayStartHour + i);
@@ -425,16 +462,28 @@ function WeekGrid({ days, today, minute, index, byId }: { days: string[]; today:
                         background: `${color}${b.done ? "16" : "2e"}`,
                         borderColor: color,
                       }}
-                      aria-label={`${title}, ${formatRange(b, settings.clock)}, ${formatDateLong(d)}${b.done ? ", done" : ""}`}
+                      aria-label={`${title}, ${formatRange(b, settings.clock)}, ${formatDateLong(d)}${b.seriesId ? ", repeats" : ""}${b.done ? ", done" : ""}`}
                     >
                       <span className="flex items-center gap-1 font-medium">
                         {b.done && <Check size={11} strokeWidth={3} className="shrink-0" style={{ color }} aria-hidden />}
                         <span className="truncate">{title}</span>
+                        {b.seriesId && h > 30 && <Repeat size={10} className="shrink-0 opacity-70" aria-hidden />}
                       </span>
                       {h > 30 && <span className="block truncate tabular-nums text-ink/75">{formatRange(b, settings.clock)}</span>}
                     </Link>
                   );
                 })}
+                {markersFor(markers, d)
+                  .filter((m) => m.time >= startMin && m.time <= endMin)
+                  .map((m) => (
+                    <div
+                      key={m.kind}
+                      className="pointer-events-none absolute inset-x-0 z-[5] border-t-2 border-dashed"
+                      style={{ top: y(m.time), borderColor: MARKER_STYLE[m.kind].color }}
+                      title={`${MARKER_STYLE[m.kind].label} ${formatMinutes(m.time, settings.clock)}`}
+                      aria-hidden
+                    />
+                  ))}
                 {d === today && minute >= startMin && minute <= endMin && (
                   <div className="pointer-events-none absolute inset-x-0 z-10 flex items-center" style={{ top: y(minute) }} aria-hidden>
                     <span className="-ml-1 h-2 w-2 rounded-full bg-peach" />

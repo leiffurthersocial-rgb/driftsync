@@ -1,30 +1,81 @@
 "use client";
 
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Repeat as RepeatIcon, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useApp } from "@/store/app-store";
+import type { Block } from "@/data/schema";
+import { useApp, type RepeatScope, type SeriesPatch } from "@/store/app-store";
 import { toast } from "@/store/ui-store";
 import { Dialog } from "@/components/ui/dialog";
-import { ColorSwatches, Switch } from "@/components/ui/controls";
-import { DAY_MINUTES, formatDuration, formatMinutes } from "@/lib/time";
+import { ColorSwatches, Segmented, Switch } from "@/components/ui/controls";
+import { RepeatPicker } from "@/components/ui/repeat-picker";
+import { DAY_MINUTES, formatDateLong, formatDuration, formatMinutes } from "@/lib/time";
+import { describeRepeat } from "@/lib/recurrence";
+import { findBlock } from "@/lib/series";
 import { cn } from "@/lib/cn";
-import { stamp } from "@/lib/id";
 
-/** Side sheet for editing a block. Changes save immediately. */
-export function BlockEditor({ blockId, isNew, onClose }: { blockId: string | null; isNew: boolean; onClose(): void }) {
-  const block = useApp((s) => s.blocks.find((b) => b.id === blockId) ?? null);
+const SERIES_FIELDS = ["title", "activityId", "color", "notes", "goalId", "start", "end"] as const;
+
+/**
+ * Side sheet for editing a block. Changes save immediately. For a repeating block you choose
+ * whether edits apply to this day only or to this and every later occurrence.
+ */
+export function BlockEditor({
+  blockId,
+  isNew,
+  onClose,
+  onIdChange,
+}: {
+  blockId: string | null;
+  isNew: boolean;
+  onClose(): void;
+  /** Editing an unsaved repeat occurrence saves it under a new id. */
+  onIdChange?(id: string): void;
+}) {
+  const blocks = useApp((s) => s.blocks);
+  const allSeries = useApp((s) => s.series);
+  const block = useMemo(() => (blockId ? findBlock(blockId, blocks, allSeries) : null), [blockId, blocks, allSeries]);
+  const series = block?.seriesId ? (allSeries.find((x) => x.id === block.seriesId) ?? null) : null;
   const activities = useApp((s) => s.activities);
   const todos = useApp((s) => s.todos);
   const goals = useApp((s) => s.goals);
   const clock = useApp((s) => s.settings.clock);
-  const { updateBlock, removeBlock } = useApp.getState();
+  const weekStart = useApp((s) => s.settings.weekStart);
   const [title, setTitle] = useState("");
+  const [scope, setScope] = useState<RepeatScope>("one");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const opened = blockId !== null;
 
   useEffect(() => {
     if (block) setTitle(block.title);
     // only when switching blocks
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [block?.id]);
+  useEffect(() => {
+    setScope("one");
+    setConfirmDelete(false);
+  }, [opened]);
+
+  const follow = (id: string | null) => {
+    if (id === null) onClose();
+    else if (id !== blockId) onIdChange?.(id);
+  };
+
+  /** Apply a change to this block, or to the series from here on. */
+  const updateBlock = (id: string, patch: Partial<Block>) => {
+    const st = useApp.getState();
+    if (series && scope === "upcoming") {
+      const sp: SeriesPatch = {};
+      const rest: Partial<Block> = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if ((SERIES_FIELDS as readonly string[]).includes(k)) (sp as Record<string, unknown>)[k] = v;
+        else (rest as Record<string, unknown>)[k] = v;
+      }
+      let next = Object.keys(sp).length ? st.updateSeriesFrom(id, sp) : id;
+      if (next && Object.keys(rest).length) next = st.updateBlock(next, rest);
+      follow(next);
+    } else follow(st.updateBlock(id, patch));
+  };
+  const removeBlock = (id: string, sc: RepeatScope = "one") => useApp.getState().removeBlock(id, sc);
 
   const times = useMemo(() => Array.from({ length: DAY_MINUTES / 15 + 1 }, (_, i) => i * 15), []);
   const sorted = useMemo(() => [...activities].sort((a, b) => a.order - b.order), [activities]);
@@ -41,11 +92,17 @@ export function BlockEditor({ blockId, isNew, onClose }: { blockId: string | nul
 
   const act = activities.find((a) => a.id === block.activityId);
   const remove = () => {
+    if (series) return setConfirmDelete(true);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, createdAt, updatedAt, deletedAt, ...rest } = block;
     removeBlock(block.id);
     onClose();
     toast("Block removed", { action: { label: "Undo", run: () => useApp.getState().addBlock(rest) } });
+  };
+  const removeSeries = (sc: RepeatScope) => {
+    removeBlock(block.id, sc);
+    onClose();
+    toast(sc === "one" ? `Removed from ${formatDateLong(block.date)}` : "Removed this and upcoming");
   };
 
   return (
@@ -56,29 +113,68 @@ export function BlockEditor({ blockId, isNew, onClose }: { blockId: string | nul
       title={isNew ? "New block" : "Edit block"}
       description={`${formatMinutes(block.start, clock)} – ${formatMinutes(block.end, clock)} · ${formatDuration(block.end - block.start)}`}
       footer={
-        <>
-          <button className="btn-ghost mr-auto text-danger" onClick={remove}>
-            <Trash2 size={16} /> Delete
-          </button>
-          <button
-            className="btn-ghost"
-            onClick={() => {
-              const len = block.end - block.start;
-              const start = Math.min(block.end, DAY_MINUTES - len);
-              useApp.getState().addBlock({ ...block, ...stamp(), start, end: start + len, done: false });
-              toast("Duplicated after this block");
-            }}
-            aria-label="Duplicate block"
-          >
-            <Copy size={16} />
-          </button>
-          <button className="btn-primary" onClick={close}>
-            Done
-          </button>
-        </>
+        confirmDelete ? (
+          <div className="flex w-full flex-wrap items-center gap-2" role="group" aria-label="Delete repeating block">
+            <span className="mr-auto text-sm font-medium">Delete…</span>
+            <button className="btn-ghost" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </button>
+            <button className="btn-soft text-danger" onClick={() => removeSeries("one")} data-autofocus>
+              This day
+            </button>
+            <button className="btn-danger" onClick={() => removeSeries("upcoming")}>
+              This &amp; upcoming
+            </button>
+          </div>
+        ) : (
+          <>
+            <button className="btn-ghost mr-auto text-danger" onClick={remove}>
+              <Trash2 size={16} /> Delete
+            </button>
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                const len = block.end - block.start;
+                const start = Math.min(block.end, DAY_MINUTES - len);
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { id, createdAt, updatedAt, deletedAt, ...rest } = block;
+                useApp.getState().addBlock({ ...rest, start, end: start + len, done: false, seriesId: null, seriesDate: null });
+                toast("Duplicated after this block");
+              }}
+              aria-label="Duplicate block"
+            >
+              <Copy size={16} />
+            </button>
+            <button className="btn-primary" onClick={close}>
+              Done
+            </button>
+          </>
+        )
       }
     >
       <div className="space-y-5">
+        {series && (
+          <div className="space-y-2 rounded-2xl bg-surface-2/60 px-4 py-3">
+            <p className="flex items-center gap-2 text-sm">
+              <RepeatIcon size={14} className="shrink-0 text-accent" aria-hidden />
+              <span>{describeRepeat(series.repeat, series.from)}</span>
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted" id="scope-label">
+                Changes apply to
+              </span>
+              <Segmented
+                label="Changes apply to"
+                value={scope}
+                onChange={setScope}
+                options={[
+                  { value: "one", label: "This day" },
+                  { value: "upcoming", label: "This & upcoming" },
+                ]}
+              />
+            </div>
+          </div>
+        )}
         <div>
           <label htmlFor="block-title" className="label">
             Title
@@ -151,6 +247,24 @@ export function BlockEditor({ blockId, isNew, onClose }: { blockId: string | nul
                 ))}
             </select>
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="block-repeat" className="label">
+            Repeat
+          </label>
+          <RepeatPicker
+            id="block-repeat"
+            value={series?.repeat ?? null}
+            anchor={block.date}
+            weekStart={weekStart}
+            onChange={(r) => {
+              if (title !== block.title) useApp.getState().updateBlock(block.id, { title: title.trim() });
+              follow(useApp.getState().setBlockRepeat(block.id, r));
+              if (r && !series) toast(describeRepeat(r, block.date), { tone: "success" });
+            }}
+          />
+          {series && <p className="mt-1.5 text-xs text-muted">Changing the repeat applies from this day on. “Does not repeat” keeps this day and stops the ones after.</p>}
         </div>
 
         <div>

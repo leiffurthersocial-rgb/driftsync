@@ -108,6 +108,8 @@ export class LocalStorageRepository implements Repository {
   settings = this.singleton("settings");
   activities = this.collection("activities");
   blocks = this.collection("blocks");
+  series = this.collection("series");
+  markers = this.collection("markers");
   todos = this.collection("todos");
   lists = this.collection("lists");
   goals = this.collection("goals");
@@ -134,7 +136,7 @@ export class LocalStorageRepository implements Repository {
   }
 }
 
-const COLLECTIONS: CollectionKey[] = ["activities", "blocks", "todos", "lists", "goals", "templates"];
+const COLLECTIONS: CollectionKey[] = ["activities", "blocks", "series", "markers", "todos", "lists", "goals", "templates"];
 
 function mapCollections(data: AppData, fn: <T extends BaseRecord>(arr: T[]) => T[]): AppData {
   const out = { ...data };

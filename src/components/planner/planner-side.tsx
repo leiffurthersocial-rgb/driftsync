@@ -1,11 +1,13 @@
 "use client";
 
-import { CalendarClock, GripVertical, Inbox, LayoutTemplate } from "lucide-react";
+import { CalendarClock, CalendarRange, GripVertical, Inbox, LayoutTemplate, Moon, Pencil, Sun } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useApp } from "@/store/app-store";
 import { EmptyState } from "@/components/ui/controls";
-import { formatDateShort } from "@/lib/time";
+import { formatDateShort, formatMinutes } from "@/lib/time";
+import { useDayMarkers } from "@/hooks/use-day-blocks";
 import { TODO_DRAG_TYPE } from "./timeline";
 import { cn } from "@/lib/cn";
 
@@ -16,12 +18,14 @@ export function PlannerSide({
   date,
   onSchedule,
   onApplyTemplate,
+  onEditSleep,
   onPointerDragMove,
   onPointerDragEnd,
 }: {
   date: string;
   onSchedule(todoId: string): void;
   onApplyTemplate(id: string): void;
+  onEditSleep(): void;
   /** Touch/pen drag: hovering a viewport point. */
   onPointerDragMove(x: number, y: number): void;
   /** Touch/pen drag: released at a viewport point. */
@@ -40,6 +44,8 @@ export function PlannerSide({
   }, [ghost]);
 
   const todos = useApp((s) => s.todos);
+  const clock = useApp((s) => s.settings.clock);
+  const markers = useDayMarkers(date);
   const templates = useApp((s) => s.templates);
   const blocks = useApp((s) => s.blocks);
   const scheduled = useMemo(() => new Set(blocks.filter((b) => b.date === date && b.todoId).map((b) => b.todoId)), [blocks, date]);
@@ -145,20 +151,56 @@ export function PlannerSide({
         )}
       </section>
 
+      <section className="card p-4" aria-labelledby="side-sleep">
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="side-sleep" className="text-sm font-semibold">
+            Sleep
+          </h2>
+          <button className="btn-ghost h-7 px-2 text-xs text-accent" onClick={onEditSleep}>
+            {markers.length ? "Edit" : "Set times"}
+          </button>
+        </div>
+        {markers.length === 0 ? (
+          <p className="mt-1 text-sm text-muted">Add wake-up and bedtime lines to see your awake hours.</p>
+        ) : (
+          <ul className="mt-2 flex gap-4 text-sm">
+            {markers.map((m) => (
+              <li key={m.kind} className="flex items-center gap-1.5">
+                {m.kind === "wake" ? <Sun size={14} className="text-[#e0962e]" aria-hidden /> : <Moon size={14} className="text-[#7c8cf0]" aria-hidden />}
+                <span className="sr-only">{m.kind === "wake" ? "Wake up" : "Bedtime"}</span>
+                <span className="tabular-nums">{formatMinutes(m.time, clock)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="card p-4" aria-labelledby="side-templates">
-        <h2 id="side-templates" className="mb-2 text-sm font-semibold">
-          Templates
-        </h2>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 id="side-templates" className="text-sm font-semibold">
+            Templates
+          </h2>
+          <Link href="/templates" className="rounded-lg px-1 text-xs font-medium text-accent hover:underline">
+            Manage
+          </Link>
+        </div>
         {templates.length === 0 ? (
-          <p className="text-sm text-muted">Save a day as a template from the ⋯ menu.</p>
+          <p className="text-sm text-muted">Save a day or week as a template from the ⋯ menu.</p>
         ) : (
           <ul className="space-y-1">
             {templates.map((t) => (
-              <li key={t.id} className="flex items-center gap-2">
-                <LayoutTemplate size={15} className="shrink-0 text-muted" aria-hidden />
-                <span className="min-w-0 flex-1 truncate text-sm">{t.name}</span>
-                <span className="text-xs text-muted">{t.blocks.length} blocks</span>
-                <button className="btn-soft h-7 px-2.5 text-xs" onClick={() => onApplyTemplate(t.id)}>
+              <li key={t.id} className="group flex items-center gap-2">
+                {t.kind === "week" ? <CalendarRange size={15} className="shrink-0 text-muted" aria-hidden /> : <LayoutTemplate size={15} className="shrink-0 text-muted" aria-hidden />}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{t.name}</span>
+                  <span className="block text-[11px] text-muted">
+                    {t.kind === "week" ? "Week" : "Day"} · {t.blocks.length} blocks
+                  </span>
+                </span>
+                <Link href={`/templates?id=${t.id}`} className="btn-ghost h-7 w-7 shrink-0 p-0 text-muted" aria-label={`Edit template ${t.name}`}>
+                  <Pencil size={13} />
+                </Link>
+                <button className="btn-soft h-7 px-2.5 text-xs" onClick={() => onApplyTemplate(t.id)} aria-label={`Apply ${t.name}${t.kind === "week" ? " to this week" : " to this day"}`}>
                   Apply
                 </button>
               </li>

@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, Check, Moon, Repeat, Sun } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import type { Activity, Block } from "@/data/schema";
+import type { Activity, Block, MarkerKind } from "@/data/schema";
 import { blockColor } from "@/lib/activities";
 import {
   DAY_MINUTES,
@@ -25,8 +25,24 @@ const LONG_PRESS_MS = 320;
 
 export const TODO_DRAG_TYPE = "application/x-driftsync-todo";
 
+/** What the timeline draws: real blocks, repeat occurrences, or template blocks. */
+export type TimelineItem = Pick<Block, "id" | "start" | "end" | "title" | "activityId" | "color" | "done"> & { seriesId?: string | null };
+
+export interface TimelineMarker {
+  kind: MarkerKind;
+  time: number;
+}
+
+export const MARKER_STYLE: Record<MarkerKind, { label: string; color: string }> = {
+  wake: { label: "Wake up", color: "#e0962e" },
+  sleep: { label: "Bedtime", color: "#7c8cf0" },
+};
+
 interface Props {
-  blocks: Block[];
+  blocks: TimelineItem[];
+  /** Wake-up / bedtime lines; the hours outside them are shaded. */
+  markers?: TimelineMarker[];
+  onMarkerClick?(kind: MarkerKind): void;
   activities: Activity[];
   clock: "12h" | "24h";
   dayStartHour: number;
@@ -39,7 +55,9 @@ interface Props {
   onOpen(id: string): void;
   onCreate(range: Range): void;
   onChange(id: string, range: Range): void;
-  onDropTodo(todoId: string, minute: number): void;
+  onDropTodo?(todoId: string, minute: number): void;
+  /** Accessible name for the drawing surface. */
+  label?: string;
 }
 
 export interface TimelineHandle {
@@ -57,7 +75,7 @@ type Drag =
 
 /** Vertical day timeline with drag-to-create, drag-to-move and edge-resize, all snapped to 15 min. */
 export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(props, ref) {
-  const { blocks, activities, clock, dayStartHour, dayEndHour, nowMinute, selectedId } = props;
+  const { blocks, activities, clock, dayStartHour, dayEndHour, nowMinute, selectedId, markers = [] } = props;
   const scroller = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
@@ -75,8 +93,12 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
       start = Math.min(start, Math.floor(b.start / 60) * 60);
       end = Math.max(end, Math.ceil(b.end / 60) * 60);
     }
+    for (const m of markers) {
+      start = Math.min(start, Math.floor(m.time / 60) * 60);
+      end = Math.max(end, Math.ceil((m.time + 1) / 60) * 60);
+    }
     return { start, end: Math.min(DAY_MINUTES, end) };
-  }, [blocks, dayStartHour, dayEndHour]);
+  }, [blocks, markers, dayStartHour, dayEndHour]);
 
   const layout = useMemo(() => {
     const items = blocks.map((b) => (draft?.id === b.id ? { ...b, ...draft.range } : b));
@@ -134,7 +156,7 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
     drag.current = { kind: "create", anchor, startY: e.clientY, pointerId: e.pointerId, moved: false };
   };
 
-  const onBlockDown = (e: React.PointerEvent, b: Block) => {
+  const onBlockDown = (e: React.PointerEvent, b: TimelineItem) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     props.onSelect(b.id);
@@ -160,7 +182,7 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
     }
   };
 
-  const onHandleDown = (e: React.PointerEvent, b: Block, edge: "start" | "end") => {
+  const onHandleDown = (e: React.PointerEvent, b: TimelineItem, edge: "start" | "end") => {
     if (e.button !== 0) return;
     e.stopPropagation();
     props.onSelect(b.id);
@@ -222,7 +244,7 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
     setDraft(null);
   };
 
-  const onBlockKey = (e: React.KeyboardEvent, b: Block) => {
+  const onBlockKey = (e: React.KeyboardEvent, b: TimelineItem) => {
     const step = 15;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -238,6 +260,8 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
   const hours: number[] = [];
   for (let h = range.start; h < range.end; h += 60) hours.push(h);
   const activityOf = (id: string | null) => activities.find((a) => a.id === id);
+  const wake = markers.find((m) => m.kind === "wake");
+  const bed = markers.find((m) => m.kind === "sleep");
 
   return (
     <div ref={scroller} className="relative h-full overflow-y-auto overscroll-contain rounded-xl" tabIndex={0} aria-label="Day timeline, scrollable">
@@ -250,7 +274,7 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
         onPointerUp={onUp}
         onPointerCancel={onCancel}
         onDragOver={(e) => {
-          if (!e.dataTransfer.types.includes(TODO_DRAG_TYPE)) return;
+          if (!props.onDropTodo || !e.dataTransfer.types.includes(TODO_DRAG_TYPE)) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "copy";
           setDropMinute(snapDown(minuteAt(e.clientY)));
@@ -259,13 +283,20 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
         onDrop={(e) => {
           const id = e.dataTransfer.getData(TODO_DRAG_TYPE);
           setDropMinute(null);
-          if (!id) return;
+          if (!id || !props.onDropTodo) return;
           e.preventDefault();
           props.onDropTodo(id, Math.min(snapDown(minuteAt(e.clientY)), range.end - 15));
         }}
         role="application"
-        aria-label="Day timeline. Click or drag on empty space to add a block."
+        aria-label={props.label ?? "Day timeline. Click or drag on empty space to add a block."}
       >
+        {/* Sleep hours: shaded before wake-up and after bedtime. */}
+        {wake && wake.time > range.start && (
+          <div className="pointer-events-none absolute right-0 bg-[repeating-linear-gradient(135deg,rgb(var(--surface-2)/0.9)_0_6px,transparent_6px_12px)]" style={{ top: 0, height: (wake.time - range.start) * PPM, left: GUTTER }} aria-hidden />
+        )}
+        {bed && bed.time < range.end && (
+          <div className="pointer-events-none absolute right-0 bg-[repeating-linear-gradient(135deg,rgb(var(--surface-2)/0.9)_0_6px,transparent_6px_12px)]" style={{ top: (bed.time - range.start) * PPM, height: (range.end - bed.time) * PPM, left: GUTTER }} aria-hidden />
+        )}
         {hours.map((h) => (
           <div key={h} className="pointer-events-none absolute inset-x-0" style={{ top: (h - range.start) * PPM }}>
             <div className="absolute right-0 border-t border-line/70" style={{ left: GUTTER }} />
@@ -290,7 +321,7 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
               key={b.id}
               role="button"
               tabIndex={0}
-              aria-label={`${b.title || act?.name || "Block"}, ${formatRange(b, clock)}${b.done ? ", done" : ""}${slot.overlapping ? ", overlaps another block" : ""}`}
+              aria-label={`${b.title || act?.name || "Block"}, ${formatRange(b, clock)}${b.seriesId ? ", repeats" : ""}${b.done ? ", done" : ""}${slot.overlapping ? ", overlaps another block" : ""}`}
               aria-pressed={selected}
               onPointerDown={(e) => onBlockDown(e, b)}
               onKeyDown={(e) => onBlockKey(e, b)}
@@ -319,6 +350,7 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
                   <span className={cn("truncate text-[13px] font-medium leading-tight", b.done && "line-through")}>
                     {b.title || act?.name || "New block"}
                   </span>
+                  {b.seriesId && <Repeat size={11} className="shrink-0 text-muted" aria-hidden />}
                   {slot.overlapping && <AlertTriangle size={12} className="shrink-0 text-peach" aria-hidden />}
                 </div>
                 <span className="truncate text-[11px] leading-tight text-muted">
@@ -362,6 +394,29 @@ export const Timeline = forwardRef<TimelineHandle, Props>(function Timeline(prop
             {formatRange(draft.range, clock)}
           </div>
         )}
+
+        {/* Wake-up / bedtime lines */}
+        {markers.map((m) => {
+          const st = MARKER_STYLE[m.kind];
+          const Icon = m.kind === "wake" ? Sun : Moon;
+          return (
+            <div key={m.kind} className="pointer-events-none absolute right-0 z-[15]" style={{ top: (m.time - range.start) * PPM, left: GUTTER - 4 }}>
+              <div className="h-0.5 rounded-full" style={{ background: st.color }} />
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => props.onMarkerClick?.(m.kind)}
+                disabled={!props.onMarkerClick}
+                className="pointer-events-auto absolute right-2 top-0 flex -translate-y-1/2 items-center gap-1 rounded-full border bg-surface px-2 py-0.5 text-[11px] font-medium text-ink shadow-soft transition hover:brightness-95 disabled:pointer-events-none"
+                style={{ borderColor: st.color }}
+                aria-label={`${st.label} at ${formatMinutes(m.time, clock)}${props.onMarkerClick ? ". Edit" : ""}`}
+              >
+                <Icon size={12} style={{ color: st.color }} aria-hidden />
+                {st.label} {formatMinutes(m.time, clock)}
+              </button>
+            </div>
+          );
+        })}
 
         {/* To-do drop indicator */}
         {dropMinute !== null && (

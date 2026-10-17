@@ -3,6 +3,8 @@ import type {
   AppData,
   BaseRecord,
   Block,
+  Marker,
+  Series,
   Goal,
   Profile,
   Settings,
@@ -41,6 +43,8 @@ export interface Repository {
 
   activities: Collection<Activity>;
   blocks: Collection<Block>;
+  series: Collection<Series>;
+  markers: Collection<Marker>;
   todos: Collection<Todo>;
   lists: Collection<TodoList>;
   goals: Collection<Goal>;

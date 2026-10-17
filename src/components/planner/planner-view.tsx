@@ -1,11 +1,13 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ClipboardCopy, Eraser, Keyboard, LayoutTemplate, MoreHorizontal, Plus, Save } from "lucide-react";
+import { BedDouble, CalendarRange, ChevronLeft, ChevronRight, ClipboardCopy, Eraser, Keyboard, LayoutTemplate, MoreHorizontal, Plus, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/store/app-store";
 import { toast } from "@/store/ui-store";
 import { useNow } from "@/hooks/use-now";
+import { useBlocks, useDayMarkers } from "@/hooks/use-day-blocks";
+import { formatWeekRange, weekDays } from "@/lib/calendar";
 import { addDays, findFreeSlot, formatDateLong, formatDuration, minutesOfDay, relativeDayLabel, toDateKey, type Range } from "@/lib/time";
 import { blockColor } from "@/lib/activities";
 import { PageContainer } from "@/components/shell/page-header";
@@ -15,6 +17,7 @@ import { Segmented } from "@/components/ui/controls";
 import { Timeline, type TimelineHandle } from "./timeline";
 import { BlockEditor } from "./block-editor";
 import { PlannerSide } from "./planner-side";
+import { SleepDialog } from "./sleep-dialog";
 
 const SHORTCUTS: [string, string][] = [
   ["N", "New block in the next free slot"],
@@ -47,7 +50,8 @@ export function PlannerView() {
   const [date, setDate] = useState(initial);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; isNew: boolean } | null>(null);
-  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState<"day" | "week" | null>(null);
+  const [sleepOpen, setSleepOpen] = useState(() => params.get("sleep") === "1");
   const [copyFromOpen, setCopyFromOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -55,11 +59,11 @@ export function PlannerView() {
   const [coarse, setCoarse] = useState(false);
   useEffect(() => setCoarse(window.matchMedia("(pointer: coarse)").matches), []);
 
-  const allBlocks = useApp((s) => s.blocks);
   const activities = useApp((s) => s.activities);
   const templates = useApp((s) => s.templates);
   const settings = useApp((s) => s.settings);
-  const blocks = useMemo(() => allBlocks.filter((b) => b.date === date).sort((a, b) => a.start - b.start), [allBlocks, date]);
+  const blocks = useBlocks(date, date);
+  const markers = useDayMarkers(date);
   const isToday = date === today;
   const nowMinute = isToday ? minutesOfDay(now) : null;
 
@@ -131,15 +135,26 @@ export function PlannerView() {
   };
 
   const applyTemplate = (id: string) => {
+    const t = useApp.getState().templates.find((x) => x.id === id);
     const n = useApp.getState().applyTemplate(id, date);
-    toast(`Added ${n} block${n === 1 ? "" : "s"} from template`, { tone: "success" });
+    const where = t?.kind === "week" ? ` to ${formatWeekRange(weekDays(date, settings.weekStart))}` : "";
+    toast(`Added ${n} block${n === 1 ? "" : "s"}${where}`, { tone: "success" });
+  };
+
+  /** Change a block from the timeline; a repeat occurrence changes on this day only. */
+  const changeBlock = (id: string, patch: { start: number; end: number }) => {
+    const next = useApp.getState().updateBlock(id, patch);
+    if (next !== id) {
+      setSelectedId(next);
+      toast("Changed on this day only. Open the block to change upcoming days too.");
+    }
   };
 
   // Keyboard shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || editing || document.querySelector("[role=dialog]")) return;
-      const sel = selectedId ? useApp.getState().blocks.find((b) => b.id === selectedId) : null;
+      const sel = selectedId ? useApp.getState().blocksBetween(date, date).find((b) => b.id === selectedId) : null;
       switch (e.key) {
         case "n":
         case "N":
@@ -165,14 +180,14 @@ export function PlannerView() {
           break;
         case "d":
         case "D":
-          if (sel) useApp.getState().updateBlock(sel.id, { done: !sel.done });
+          if (sel) setSelectedId(useApp.getState().updateBlock(sel.id, { done: !sel.done }));
           break;
         case "Delete":
         case "Backspace":
           if (sel) {
-            useApp.getState().removeBlock(sel.id);
+            useApp.getState().removeBlock(sel.id, "one");
             setSelectedId(null);
-            toast("Block removed");
+            toast(sel.seriesId ? "Removed from this day (the rest of the repeat stays)" : "Block removed");
           }
           break;
         case "Escape":
@@ -182,7 +197,7 @@ export function PlannerView() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [today, selectedId, editing, newBlock]);
+  }, [today, date, selectedId, editing, newBlock]);
 
   const rel = relativeDayLabel(date, today);
   const totals = useMemo(() => {
@@ -242,10 +257,17 @@ export function PlannerView() {
             items={[
               { label: "Copy previous day", icon: <ClipboardCopy size={15} />, onSelect: () => copyFrom(addDays(date, -1)) },
               { label: "Copy from a date…", icon: <ClipboardCopy size={15} />, onSelect: () => setCopyFromOpen(true) },
+              { label: "Wake-up & bedtime…", icon: <BedDouble size={15} />, onSelect: () => setSleepOpen(true) },
               ...(templates.length ? [{ heading: "Apply template" } as const] : []),
-              ...templates.map((t) => ({ label: t.name, icon: <LayoutTemplate size={15} />, onSelect: () => applyTemplate(t.id) })),
+              ...templates.map((t) => ({
+                label: t.kind === "week" ? `${t.name} (whole week)` : t.name,
+                icon: t.kind === "week" ? <CalendarRange size={15} /> : <LayoutTemplate size={15} />,
+                onSelect: () => applyTemplate(t.id),
+              })),
               "divider",
-              { label: "Save day as template…", icon: <Save size={15} />, onSelect: () => setSaveTemplateOpen(true), disabled: !blocks.length },
+              { label: "Save day as template…", icon: <Save size={15} />, onSelect: () => setSaveTemplateOpen("day"), disabled: !blocks.length },
+              { label: "Save week as template…", icon: <Save size={15} />, onSelect: () => setSaveTemplateOpen("week") },
+              { label: "Edit templates", icon: <LayoutTemplate size={15} />, onSelect: () => router.push("/templates") },
               { label: "Keyboard shortcuts", icon: <Keyboard size={15} />, onSelect: () => setHelpOpen(true), hint: "?" },
               "divider",
               { label: "Clear this day", icon: <Eraser size={15} />, onSelect: () => setClearOpen(true), danger: true, disabled: !blocks.length },
@@ -273,6 +295,8 @@ export function PlannerView() {
           <Timeline
             ref={timeline}
             blocks={blocks}
+            markers={markers}
+            onMarkerClick={() => setSleepOpen(true)}
             activities={activities}
             clock={settings.clock}
             dayStartHour={settings.dayStartHour}
@@ -286,7 +310,7 @@ export function PlannerView() {
               const b = create(r);
               setEditing({ id: b.id, isNew: true });
             }}
-            onChange={(id, r) => useApp.getState().updateBlock(id, r)}
+            onChange={changeBlock}
             onDropTodo={(id, minute) => scheduleTodo(id, minute)}
           />
           {blocks.length === 0 && (
@@ -302,6 +326,7 @@ export function PlannerView() {
           date={date}
           onSchedule={(id) => scheduleTodo(id)}
           onApplyTemplate={applyTemplate}
+          onEditSleep={() => setSleepOpen(true)}
           onPointerDragMove={(x, y) => timeline.current?.previewDrop(timeline.current.minuteAtPoint(x, y))}
           onPointerDragEnd={(id, x, y) => {
             const minute = timeline.current?.minuteAtPoint(x, y) ?? null;
@@ -311,18 +336,27 @@ export function PlannerView() {
         />
       </div>
 
-      <BlockEditor blockId={editing?.id ?? null} isNew={!!editing?.isNew} onClose={() => setEditing(null)} />
+      <BlockEditor
+        blockId={editing?.id ?? null}
+        isNew={!!editing?.isNew}
+        onClose={() => setEditing(null)}
+        onIdChange={(id) => {
+          setEditing((e) => (e ? { ...e, id } : e));
+          setSelectedId(id);
+        }}
+      />
 
-      <SaveTemplateDialog open={saveTemplateOpen} onClose={() => setSaveTemplateOpen(false)} date={date} />
+      <SaveTemplateDialog kind={saveTemplateOpen} onClose={() => setSaveTemplateOpen(null)} date={date} weekStart={settings.weekStart} />
+      <SleepDialog open={sleepOpen} date={date} onClose={() => setSleepOpen(false)} />
       <CopyFromDialog open={copyFromOpen} onClose={() => setCopyFromOpen(false)} date={date} onCopy={copyFrom} />
       <ConfirmDialog
         open={clearOpen}
         onClose={() => setClearOpen(false)}
         title="Clear this day?"
-        description={`Removes all ${blocks.length} blocks on ${formatDateLong(date)}.`}
+        description={`Removes all ${blocks.length} blocks on ${formatDateLong(date)}.${blocks.some((b) => b.seriesId) ? " Repeating blocks are only removed from this day." : ""}`}
         confirmLabel="Clear day"
         onConfirm={() => {
-          for (const b of blocks) useApp.getState().removeBlock(b.id);
+          useApp.getState().clearDay(date);
           toast("Day cleared");
         }}
       />
@@ -342,20 +376,23 @@ export function PlannerView() {
   );
 }
 
-function SaveTemplateDialog({ open, onClose, date }: { open: boolean; onClose(): void; date: string }) {
+function SaveTemplateDialog({ kind, onClose, date, weekStart }: { kind: "day" | "week" | null; onClose(): void; date: string; weekStart: 0 | 1 }) {
   const [name, setName] = useState("");
+  const week = kind === "week";
   const save = () => {
-    useApp.getState().saveTemplate(name || "My usual day", date);
-    toast("Template saved", { tone: "success" });
+    const st = useApp.getState();
+    if (week) st.saveWeekTemplate(name || "My usual week", date);
+    else st.saveTemplate(name || "My usual day", date);
+    toast("Template saved. Edit it any time under Templates.", { tone: "success" });
     setName("");
     onClose();
   };
   return (
     <Dialog
-      open={open}
+      open={kind !== null}
       onClose={onClose}
-      title="Save as template"
-      description="Reuse this day's blocks on any other day."
+      title={week ? "Save week as template" : "Save day as template"}
+      description={week ? `Saves every block from ${formatWeekRange(weekDays(date, weekStart))}, by weekday.` : "Reuse this day's blocks on any other day."}
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
@@ -370,7 +407,15 @@ function SaveTemplateDialog({ open, onClose, date }: { open: boolean; onClose():
       <label htmlFor="tpl-name" className="label">
         Name
       </label>
-      <input id="tpl-name" data-autofocus className="input" placeholder="My usual weekday" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+      <input
+        id="tpl-name"
+        data-autofocus
+        className="input"
+        placeholder={week ? "My usual week" : "My usual weekday"}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && save()}
+      />
     </Dialog>
   );
 }

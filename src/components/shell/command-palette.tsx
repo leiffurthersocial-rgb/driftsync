@@ -6,7 +6,10 @@ import {
   CalendarDays,
   CheckSquare,
   Home,
+  BedDouble,
+  LayoutTemplate,
   Monitor,
+  Palette,
   Moon,
   Plus,
   Search,
@@ -23,6 +26,8 @@ import { toast, useUi } from "@/store/ui-store";
 import { fuzzyScore } from "@/lib/fuzzy";
 import { parseQuickAdd } from "@/lib/quick-add";
 import { cn } from "@/lib/cn";
+import { THEME_DEFS } from "@/lib/themes";
+import type { DarkTheme, LightTheme } from "@/data/schema";
 
 interface Command {
   id: string;
@@ -85,6 +90,15 @@ export function CommandPalette() {
       ...themes
         .filter((t) => t.value !== theme)
         .map((t) => ({ id: `theme-${t.value}`, label: t.label, group: "Appearance", icon: t.icon, run: () => st().updateSettings({ theme: t.value }) })),
+      ...THEME_DEFS.map((d) => ({
+        id: `palette-${d.id}`,
+        label: `Theme: ${d.name} (${d.mode})`,
+        group: "Appearance",
+        icon: Palette,
+        run: () => st().updateSettings(d.mode === "dark" ? { theme: "dark", darkTheme: d.id as DarkTheme } : { theme: "light", lightTheme: d.id as LightTheme }),
+      })),
+      { id: "nav-templates", label: "Open templates", group: "Navigate", icon: LayoutTemplate, run: go("/templates") },
+      { id: "nav-sleep", label: "Set wake-up and bedtime", group: "Planner", icon: BedDouble, run: go("/planner?day=today&sleep=1") },
     ];
   }, [theme, router]);
 
@@ -97,7 +111,10 @@ export function CommandPalette() {
       .map((x) => x.c);
     if (q) {
       const parsed = parseQuickAdd(q, useApp.getState().lists);
-      scored.splice(Math.min(scored.length, scored.length && fuzzyScore(q, scored[0].label) > 500 ? 1 : 0), 0, {
+      // The "add to-do" suggestion goes first unless a command clearly matches what was typed.
+      const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const strong = scored.length > 0 && (fuzzyScore(q, scored[0].label) > 500 || norm(scored[0].label).includes(norm(q)));
+      scored.splice(strong ? 1 : 0, 0, {
         id: "quick-todo",
         label: `Add to-do: “${parsed.title}”`,
         hint: parsed.due ? `due ${parsed.due}` : undefined,
